@@ -1,4 +1,3 @@
-import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import {
   ADMIN_SESSION_COOKIE,
@@ -9,7 +8,6 @@ import {
   isAdminPasswordValid
 } from "@/lib/auth/session";
 import { verifyMemberPassword } from "@/lib/auth/password";
-import { getSiteUrl } from "@/lib/env";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import type { TeamMemberRole } from "@/lib/types";
 
@@ -19,10 +17,11 @@ function safeRedirectPath(value: FormDataEntryValue | null) {
 }
 
 function redirectToLogin(error: string, redirectedFrom: string) {
-  const url = new URL("/login", getSiteUrl());
-  url.searchParams.set("error", error);
-  url.searchParams.set("redirectedFrom", redirectedFrom);
-  return NextResponse.redirect(url, 303);
+  const params = new URLSearchParams({ error, redirectedFrom });
+  return new NextResponse(null, {
+    status: 303,
+    headers: { Location: `/login?${params.toString()}` }
+  });
 }
 
 export async function POST(request: Request) {
@@ -75,8 +74,11 @@ export async function POST(request: Request) {
   }
 
   const token = await createSessionToken(email, sessionMember);
-  const cookieStore = await cookies();
-  cookieStore.set(ADMIN_SESSION_COOKIE, token, {
+  const response = new NextResponse(null, {
+    status: 303,
+    headers: { Location: redirectedFrom }
+  });
+  response.cookies.set(ADMIN_SESSION_COOKIE, token, {
     httpOnly: true,
     sameSite: "lax",
     secure: process.env.NODE_ENV === "production",
@@ -84,5 +86,5 @@ export async function POST(request: Request) {
     path: "/"
   });
 
-  return NextResponse.redirect(new URL(redirectedFrom, getSiteUrl()), 303);
+  return response;
 }
