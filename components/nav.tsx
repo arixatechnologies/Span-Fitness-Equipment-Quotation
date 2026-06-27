@@ -7,7 +7,6 @@ import {
   ArrowLeft,
   BarChart3,
   Boxes,
-  Building2,
   FileText,
   Home,
   ImageUp,
@@ -78,20 +77,23 @@ export function Sidebar({ role = "Admin" }: { role?: TeamMemberRole }) {
         </Link>
       </div>
 
-      <form action="/api/auth/logout" method="post" className="mt-3 md:mt-0">
-        <button
-          type="submit"
-          className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-rose md:mt-4"
-        >
-          <LogOut className="h-4 w-4" />
-          Sign out
-        </button>
-      </form>
     </aside>
   );
 }
 
-export function Topbar({ title, subtitle }: { title: string; subtitle?: string }) {
+export function Topbar({
+  title,
+  subtitle,
+  user
+}: {
+  title: string;
+  subtitle?: string;
+  user: {
+    name: string;
+    role: TeamMemberRole;
+    profilePhotoUrl?: string;
+  };
+}) {
   const router = useRouter();
 
   function goBack() {
@@ -115,9 +117,32 @@ export function Topbar({ title, subtitle }: { title: string; subtitle?: string }
           {subtitle ? <p className="text-sm text-slate-500">{subtitle}</p> : null}
         </div>
       </div>
-      <div className="flex w-full max-w-full items-center gap-2 rounded-md border border-line bg-panel px-3 py-2 text-sm text-slate-700 sm:w-fit">
-        <Building2 className="h-4 w-4 text-gold" />
-        <span className="truncate">SPAN FITNESS EQUIPMENTS</span>
+      <div className="flex w-full items-center justify-between gap-3 rounded-md border border-line bg-panel px-3 py-2 sm:w-40 sm:flex-col sm:justify-center">
+        <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-full border border-line bg-white">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={user.profilePhotoUrl || "/login image/span-logo-s.png"}
+            alt={`${user.name} profile`}
+            className="h-full w-full object-contain p-1"
+            onError={(event) => {
+              event.currentTarget.onerror = null;
+              event.currentTarget.src = "/login image/span-logo-s.png";
+            }}
+          />
+        </div>
+        <div className="min-w-0 text-right sm:text-center">
+          <div className="truncate text-sm font-black text-slate-950">{user.name}</div>
+          <div className="truncate text-xs text-slate-500">{user.role}</div>
+          <form action="/api/auth/logout" method="post">
+            <button
+              type="submit"
+              className="mt-1 inline-flex items-center gap-1.5 text-xs font-bold text-red-700 transition hover:text-red-900"
+            >
+              <LogOut className="h-3.5 w-3.5" aria-hidden="true" />
+              Sign Out
+            </button>
+          </form>
+        </div>
       </div>
     </header>
   );

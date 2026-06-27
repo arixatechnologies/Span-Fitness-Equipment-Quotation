@@ -40,6 +40,7 @@ export async function POST(request: Request) {
         id?: string;
         name: string;
         role: TeamMemberRole;
+        profilePhotoUrl?: string;
       }
     | undefined;
   let passwordOk = false;
@@ -54,7 +55,7 @@ export async function POST(request: Request) {
     const supabase = createSupabaseAdminClient();
     const { data: member, error } = await supabase
       .from("team_members")
-      .select("id, member_name, password_hash, role")
+      .select("id, member_name, password_hash, role, profile_photo_url")
       .eq("email", email)
       .eq("status", "active")
       .maybeSingle();
@@ -64,7 +65,8 @@ export async function POST(request: Request) {
       sessionMember = {
         id: member.id,
         name: member.member_name,
-        role: member.role as TeamMemberRole
+        role: member.role as TeamMemberRole,
+        profilePhotoUrl: member.profile_photo_url || undefined
       };
     }
   }

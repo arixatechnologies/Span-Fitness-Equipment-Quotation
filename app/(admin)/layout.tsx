@@ -15,7 +15,14 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     <div className="flex min-h-screen flex-col bg-panel md:flex-row">
       <Sidebar role={session?.role || "Admin"} />
       <div className="min-w-0 flex-1">
-        <Topbar title="Quotation Management" />
+        <Topbar
+          title="Quotation Management"
+          user={{
+            name: session?.name || "Administrator",
+            role: session?.role || "Admin",
+            profilePhotoUrl: session?.profilePhotoUrl
+          }}
+        />
         <main className="px-4 py-5 md:px-7 md:py-6">
           {supabaseIssue ? <SupabaseSetupNotice issue={supabaseIssue} /> : children}
         </main>
