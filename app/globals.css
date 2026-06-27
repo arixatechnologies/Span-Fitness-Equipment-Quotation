@@ -1,0 +1,70 @@
+@import "cropperjs/dist/cropper.css";
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+  --background: #FFE3E3;
+  --foreground: #24323a;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  min-height: 100%;
+}
+
+body {
+  min-height: 100%;
+  margin: 0;
+  background: linear-gradient(180deg, #FFE3E3 0%, #E4D8DC 46%, #C9CCD5 100%);
+  color: var(--foreground);
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+.field-label {
+  @apply mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500;
+}
+
+.field-input {
+  @apply w-full rounded-md border border-line bg-white px-3 py-2 text-sm text-ink outline-none transition placeholder:text-slate-400 focus:border-mist focus:ring-2 focus:ring-mist/30;
+}
+
+.btn-primary {
+  @apply inline-flex items-center justify-center gap-2 rounded-md border border-mist bg-mist px-4 py-2 text-sm font-bold text-ink shadow-sm transition hover:border-cloud hover:bg-cloud disabled:cursor-not-allowed disabled:opacity-60;
+}
+
+.btn-secondary {
+  @apply inline-flex items-center justify-center gap-2 rounded-md border border-line bg-white px-4 py-2 text-sm font-semibold text-ink shadow-sm transition hover:bg-rose disabled:cursor-not-allowed disabled:opacity-60;
+}
+
+.btn-muted {
+  @apply inline-flex items-center justify-center gap-2 rounded-md border border-line bg-blush px-4 py-2 text-sm font-semibold text-ink shadow-sm transition hover:bg-rose disabled:cursor-not-allowed disabled:opacity-60;
+}
+
+.btn-danger {
+  @apply inline-flex items-center justify-center gap-2 rounded-md border border-red-200 bg-red-50 px-4 py-2 text-sm font-semibold text-red-700 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-60;
+}
+
+.panel {
+  @apply rounded-lg border border-line bg-white/95 shadow-soft backdrop-blur;
+}
+
+.table-head {
+  @apply bg-blush text-left text-xs font-bold uppercase tracking-wide text-ink;
+}
+
+.table-cell {
+  @apply border-b border-line px-4 py-3 text-sm text-slate-700;
+}

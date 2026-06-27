@@ -1,0 +1,14 @@
+node_modules
+.next
+out
+dist
+.env
+.env*.local
+*.log
+coverage
+.vercel
+.codex
+supabase/.temp
+playwright-report
+test-results
+tsconfig.tsbuildinfo
