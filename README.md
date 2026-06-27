@@ -76,6 +76,7 @@ Or run the SQL files manually in Supabase SQL Editor:
 - `supabase/migrations/005_update_ui_theme_color.sql`
 - `supabase/migrations/006_add_team_members.sql`
 - `supabase/migrations/007_add_member_profile_photos.sql`
+- `supabase/migrations/008_add_account_profile_fields.sql`
 
 5. Set your admin login.
 

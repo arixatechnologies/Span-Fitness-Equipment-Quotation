@@ -39,7 +39,7 @@ export default function AdminError({
             <li>Run `supabase/migrations/002_seed.sql` second.</li>
             <li>
               Run every later migration in order, including `005_update_ui_theme_color.sql` and
-              `006_add_team_members.sql`.
+              migrations through `008_add_account_profile_fields.sql`.
             </li>
             <li>Restart the dev server and refresh this page.</li>
           </ol>

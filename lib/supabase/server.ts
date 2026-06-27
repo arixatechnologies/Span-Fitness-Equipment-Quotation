@@ -22,7 +22,8 @@ export async function requireUser() {
       id: session.memberId || null,
       email: session.email,
       name: session.name,
-      role: session.role
+      role: session.role,
+      profilePhotoUrl: session.profilePhotoUrl
     }
   };
 }

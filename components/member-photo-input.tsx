@@ -3,8 +3,12 @@
 import { Camera } from "lucide-react";
 import { useEffect, useState } from "react";
 
-export function MemberPhotoInput() {
-  const [previewUrl, setPreviewUrl] = useState("");
+export function MemberPhotoInput({
+  existingPhotoUrl = ""
+}: {
+  existingPhotoUrl?: string | null;
+}) {
+  const [previewUrl, setPreviewUrl] = useState(existingPhotoUrl || "");
 
   useEffect(() => {
     return () => {
@@ -22,7 +26,7 @@ export function MemberPhotoInput() {
         URL.revokeObjectURL(current);
       }
 
-      return file ? URL.createObjectURL(file) : "";
+      return file ? URL.createObjectURL(file) : existingPhotoUrl || "";
     });
   }
 

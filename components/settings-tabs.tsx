@@ -6,7 +6,8 @@ import clsx from "clsx";
 
 const tabs = [
   { href: "/settings/company", label: "Company" },
-  { href: "/settings/terms", label: "Terms" }
+  { href: "/settings/terms", label: "Terms" },
+  { href: "/settings/profile", label: "My Profile" }
 ];
 
 export function SettingsTabs() {

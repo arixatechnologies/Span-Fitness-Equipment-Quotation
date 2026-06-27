@@ -47,9 +47,27 @@ export async function POST(request: Request) {
 
   if (email === adminEmail) {
     passwordOk = await isAdminPasswordValid(password);
+    let profile:
+      | {
+          full_name: string | null;
+          profile_photo_url: string | null;
+        }
+      | null = null;
+
+    if (passwordOk) {
+      const supabase = createSupabaseAdminClient();
+      const { data } = await supabase
+        .from("profiles")
+        .select("full_name, profile_photo_url")
+        .eq("email", adminEmail)
+        .maybeSingle();
+      profile = data;
+    }
+
     sessionMember = {
-      name: "Administrator",
-      role: "Admin"
+      name: profile?.full_name || "Administrator",
+      role: "Admin",
+      profilePhotoUrl: profile?.profile_photo_url || undefined
     };
   } else {
     const supabase = createSupabaseAdminClient();
