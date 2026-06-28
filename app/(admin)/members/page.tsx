@@ -34,7 +34,7 @@ export default async function MembersPage() {
   const { data, error } = await supabase
     .from("team_members")
     .select(
-      "id, member_name, phone_number, email, role, branch_location, status, profile_photo_url, profile_photo_path, created_at, updated_at"
+      "id, member_name, phone_number, email, role, branch_location, max_discount_percent, status, profile_photo_url, profile_photo_path, created_at, updated_at"
     )
     .order("created_at", { ascending: false });
 
@@ -135,6 +135,23 @@ export default async function MembersPage() {
               required
             />
           </label>
+          <label htmlFor="member-max-discount">
+            <span className="field-label">
+              Maximum Discount (%)
+              <RequiredMark />
+            </span>
+            <input
+              id="member-max-discount"
+              className="field-input"
+              name="max_discount_percent"
+              type="number"
+              min="0"
+              max="100"
+              step="0.01"
+              defaultValue="48"
+              required
+            />
+          </label>
           <div>
             <label className="field-label" htmlFor="member-status">
               Status
@@ -182,6 +199,7 @@ export default async function MembersPage() {
                     <div>{member.phone_number}</div>
                     <div>{member.role}</div>
                     <div>{member.branch_location}</div>
+                    <div>Maximum Discount: {Number(member.max_discount_percent)}%</div>
                   </div>
                   <div className="mt-3 grid grid-cols-2 gap-2">
                     <form action={toggleMemberStatusAction}>
@@ -219,6 +237,7 @@ export default async function MembersPage() {
                     <th className="px-4 py-3">Phone Number</th>
                     <th className="px-4 py-3">Role</th>
                     <th className="px-4 py-3">Branch / Location</th>
+                    <th className="px-4 py-3">Maximum Discount</th>
                     <th className="px-4 py-3">Status</th>
                     <th className="px-4 py-3 text-right">Actions</th>
                   </tr>
@@ -238,6 +257,7 @@ export default async function MembersPage() {
                       <td className="table-cell">{member.phone_number}</td>
                       <td className="table-cell">{member.role}</td>
                       <td className="table-cell">{member.branch_location}</td>
+                      <td className="table-cell">{Number(member.max_discount_percent)}%</td>
                       <td className="table-cell">
                         <StatusBadge status={member.status} />
                       </td>

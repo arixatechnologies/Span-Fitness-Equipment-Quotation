@@ -16,6 +16,7 @@ const memberSchema = z.object({
   password: z.string().min(8).max(128),
   role: z.enum(["Admin", "Manager", "Sales Executive"]),
   branch_location: z.string().trim().min(2).max(150),
+  max_discount_percent: z.coerce.number().min(0).max(100),
   status: z.enum(["active", "inactive"])
 });
 
@@ -63,6 +64,7 @@ export async function addMemberAction(formData: FormData) {
     password: formData.get("password"),
     role: formData.get("role"),
     branch_location: formData.get("branch_location"),
+    max_discount_percent: formData.get("max_discount_percent"),
     status: formData.get("status")
   });
 
@@ -83,6 +85,7 @@ export async function addMemberAction(formData: FormData) {
       password_hash: await hashMemberPassword(parsed.password),
       role: parsed.role,
       branch_location: parsed.branch_location,
+      max_discount_percent: parsed.max_discount_percent,
       status: parsed.status,
       profile_photo_url: photo.url,
       profile_photo_path: photo.path
@@ -107,7 +110,10 @@ export async function addMemberAction(formData: FormData) {
     action: "Team member added",
     entityType: "team_member",
     entityId: data.id,
-    metadata: { role: parsed.role }
+    metadata: {
+      role: parsed.role,
+      maxDiscountPercent: parsed.max_discount_percent
+    }
   });
 
   revalidatePath("/members");

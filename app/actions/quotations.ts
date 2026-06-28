@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { calculateQuotation } from "@/lib/calculations";
 import { getCompanySettings, getQuotationWithItems, logActivity } from "@/lib/data";
+import { discountLimitMessage, exceedsDiscountLimit } from "@/lib/discount-limit";
 import { isTenDigitPhone, PHONE_VALIDATION_MESSAGE } from "@/lib/phone";
 import { makeQuoteNumber, generateBaseQuoteNumber } from "@/lib/quotation-number";
 import { requireUser } from "@/lib/supabase/server";
@@ -124,6 +125,21 @@ export async function saveQuotationAction(formData: FormData) {
   const gstMode = z.enum(["add", "included", "none"]).parse(formData.get("gst_mode"));
   const rawItems = JSON.parse(String(formData.get("items") || "[]"));
   const items = z.array(itemSchema).min(1).parse(rawItems) as QuotationItemInput[];
+
+  const maxDiscountPercent = user.maxDiscountPercent;
+
+  if (maxDiscountPercent !== null) {
+    const invalidItem = items.find((item) =>
+      exceedsDiscountLimit(item.unit_price, item.special_price, maxDiscountPercent)
+    );
+
+    if (invalidItem) {
+      throw new Error(
+        `${discountLimitMessage(maxDiscountPercent)} Product: ${invalidItem.product_name}.`
+      );
+    }
+  }
+
   const calculated = calculateQuotation(items, gstMode as GstMode);
   const { customerId, customerSnapshot } = await resolveCustomer(supabase, formData);
   const basePayload = quotationPayloadFromForm(

@@ -10,6 +10,10 @@ import { StateCitySelects } from "@/components/state-city-selects";
 import { SubmitButton } from "@/components/submit-button";
 import { calculateQuotation } from "@/lib/calculations";
 import { customerSuffixOptions } from "@/lib/customer-options";
+import {
+  discountLimitMessage,
+  getMinimumSpecialPrice
+} from "@/lib/discount-limit";
 import { formatCustomerName } from "@/lib/format";
 import type {
   CompanySettings,
@@ -28,6 +32,7 @@ type QuotationBuilderProps = {
   products: BuilderProduct[];
   customers: Customer[];
   settings: CompanySettings;
+  maxDiscountPercent: number | null;
   quotation?: Quotation;
   quotationItems?: QuotationItem[];
 };
@@ -113,6 +118,18 @@ function itemFromQuotation(item: QuotationItem): QuotationItemInput {
     special_price: Number(item.special_price || 0),
     qty: Number(item.qty || 1),
     gst_percent: Number(item.gst_percent || 18)
+  };
+}
+
+function applyDiscountLimit(item: QuotationItemInput, maxDiscountPercent: number | null) {
+  if (maxDiscountPercent === null) return item;
+
+  return {
+    ...item,
+    special_price: Math.max(
+      Number(item.special_price || 0),
+      getMinimumSpecialPrice(Number(item.unit_price || 0), maxDiscountPercent)
+    )
   };
 }
 
@@ -248,6 +265,7 @@ export function QuotationBuilder({
   products,
   customers,
   settings,
+  maxDiscountPercent,
   quotation,
   quotationItems = []
 }: QuotationBuilderProps) {
@@ -257,8 +275,11 @@ export function QuotationBuilder({
   );
   const [customerId, setCustomerId] = useState(quotation?.customer_id || customers[0]?.id || "");
   const [items, setItems] = useState<QuotationItemInput[]>(
-    quotationItems.length ? quotationItems.map(itemFromQuotation) : []
+    quotationItems.length
+      ? quotationItems.map(itemFromQuotation).map((item) => applyDiscountLimit(item, maxDiscountPercent))
+      : []
   );
+  const [discountMessages, setDiscountMessages] = useState<Record<number, string>>({});
   const [openProductRow, setOpenProductRow] = useState<number | null>(null);
   const [productSearches, setProductSearches] = useState<Record<number, string>>({});
   const gstMode = quotation?.gst_mode || settings.default_gst_mode;
@@ -306,6 +327,17 @@ export function QuotationBuilder({
     );
   }
 
+  function setDiscountMessage(index: number, message?: string) {
+    setDiscountMessages((current) => {
+      if (message) return { ...current, [index]: message };
+      if (!current[index]) return current;
+
+      const next = { ...current };
+      delete next[index];
+      return next;
+    });
+  }
+
   function selectProduct(index: number, product: BuilderProduct) {
     setItems((current) =>
       current.map((item, itemIndex) => {
@@ -336,7 +368,18 @@ export function QuotationBuilder({
   }
 
   function updateDiscount(index: number, value: string) {
-    const discount = Math.min(100, Math.max(0, Number(value || 0)));
+    const requestedDiscount = Math.min(100, Math.max(0, Number(value || 0)));
+    const discount =
+      maxDiscountPercent === null
+        ? requestedDiscount
+        : Math.min(requestedDiscount, maxDiscountPercent);
+
+    setDiscountMessage(
+      index,
+      maxDiscountPercent !== null && requestedDiscount > maxDiscountPercent
+        ? discountLimitMessage(maxDiscountPercent)
+        : undefined
+    );
 
     setItems((current) =>
       current.map((item, itemIndex) => {
@@ -350,6 +393,25 @@ export function QuotationBuilder({
     );
   }
 
+  function updateSpecialPrice(index: number, value: string) {
+    const requestedPrice = Math.max(0, Number(value || 0));
+    const item = items[index];
+    if (!item) return;
+
+    const minimumPrice =
+      maxDiscountPercent === null
+        ? 0
+        : getMinimumSpecialPrice(Number(item.unit_price || 0), maxDiscountPercent);
+
+    setDiscountMessage(
+      index,
+      maxDiscountPercent !== null && requestedPrice < minimumPrice
+        ? discountLimitMessage(maxDiscountPercent)
+        : undefined
+    );
+    updateItem(index, { special_price: Math.max(requestedPrice, minimumPrice) });
+  }
+
   function removeItem(index: number) {
     setItems((current) => current.filter((_, itemIndex) => itemIndex !== index));
     setOpenProductRow((current) => {
@@ -359,6 +421,17 @@ export function QuotationBuilder({
       return current;
     });
     setProductSearches((current) => {
+      const next: Record<number, string> = {};
+
+      Object.entries(current).forEach(([key, value]) => {
+        const rowIndex = Number(key);
+        if (rowIndex < index) next[rowIndex] = value;
+        if (rowIndex > index) next[rowIndex - 1] = value;
+      });
+
+      return next;
+    });
+    setDiscountMessages((current) => {
       const next: Record<number, string> = {};
 
       Object.entries(current).forEach(([key, value]) => {
@@ -640,11 +713,16 @@ export function QuotationBuilder({
                       className="h-10 w-full min-w-0 rounded-md border border-slate-300 bg-white px-2 text-xs text-slate-900 outline-none focus:border-gold focus:ring-2 focus:ring-gold/25"
                       type="number"
                       min="0"
-                      max="100"
+                      max={maxDiscountPercent ?? 100}
                       step="0.01"
                       value={getDiscountPercent(item)}
                       onChange={(event) => updateDiscount(index, event.target.value)}
                     />
+                    {discountMessages[index] ? (
+                      <p className="mt-1 text-[10px] font-semibold leading-tight text-red-600" aria-live="polite">
+                        {discountMessages[index]}
+                      </p>
+                    ) : null}
                   </td>
                   <td className="px-2 py-3">
                     <input
@@ -654,9 +732,7 @@ export function QuotationBuilder({
                       step="0.01"
                       value={item.product_name ? item.special_price : ""}
                       required={Boolean(item.product_name)}
-                      onChange={(event) =>
-                        updateItem(index, { special_price: Math.max(0, Number(event.target.value || 0)) })
-                      }
+                      onChange={(event) => updateSpecialPrice(index, event.target.value)}
                     />
                   </td>
                   <td className="px-1 py-3 text-center text-xs font-black text-black">
@@ -798,11 +874,16 @@ export function QuotationBuilder({
                     className="h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-xs text-slate-900 outline-none focus:border-gold focus:ring-2 focus:ring-gold/25"
                     type="number"
                     min="0"
-                    max="100"
+                    max={maxDiscountPercent ?? 100}
                     step="0.01"
                     value={getDiscountPercent(item)}
                     onChange={(event) => updateDiscount(index, event.target.value)}
                   />
+                  {discountMessages[index] ? (
+                    <p className="mt-1 text-xs font-semibold text-red-600" aria-live="polite">
+                      {discountMessages[index]}
+                    </p>
+                  ) : null}
                 </label>
                 <label>
                   <span className="field-label">
@@ -816,9 +897,7 @@ export function QuotationBuilder({
                     step="0.01"
                     value={item.product_name ? item.special_price : ""}
                     required={Boolean(item.product_name)}
-                    onChange={(event) =>
-                      updateItem(index, { special_price: Math.max(0, Number(event.target.value || 0)) })
-                    }
+                    onChange={(event) => updateSpecialPrice(index, event.target.value)}
                   />
                 </label>
                 <label>

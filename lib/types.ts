@@ -9,6 +9,7 @@ export type TeamMember = {
   password_hash: string;
   role: TeamMemberRole;
   branch_location: string;
+  max_discount_percent: number;
   status: Status;
   profile_photo_url: string | null;
   profile_photo_path: string | null;
