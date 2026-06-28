@@ -4,6 +4,10 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { getCompanySettings, logActivity } from "@/lib/data";
+import {
+  isValidPhoneList,
+  PHONE_LIST_VALIDATION_MESSAGE
+} from "@/lib/phone";
 import { requireUser } from "@/lib/supabase/server";
 
 function clean(value: FormDataEntryValue | null) {
@@ -62,7 +66,14 @@ export async function saveCompanySettingsAction(formData: FormData) {
     company_name: z.string().min(1).parse(String(formData.get("company_name") || "").trim()),
     logo_url: logoUrl,
     gst_number: String(formData.get("gst_number") || "").trim(),
-    phone_numbers: String(formData.get("phone_numbers") || "").trim(),
+    phone_numbers: z
+      .string()
+      .trim()
+      .refine(
+        (value) => !value || isValidPhoneList(value),
+        PHONE_LIST_VALIDATION_MESSAGE
+      )
+      .parse(formData.get("phone_numbers")),
     email: String(formData.get("email") || "").trim(),
     address: String(formData.get("address") || "").trim(),
     bank_name: String(formData.get("bank_name") || "").trim(),

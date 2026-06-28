@@ -4,15 +4,18 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { logActivity } from "@/lib/data";
+import { isTenDigitPhone, PHONE_VALIDATION_MESSAGE } from "@/lib/phone";
 import { requireUser } from "@/lib/supabase/server";
+
+const phoneSchema = z.string().trim().refine(isTenDigitPhone, PHONE_VALIDATION_MESSAGE);
 
 const customerSchema = z.object({
   id: z.string().uuid().optional().or(z.literal("")),
   customer_name: z.string().min(1),
   business_name: z.string().nullable().optional(),
-  phone: z.string().min(1),
+  phone: phoneSchema,
   suffix: z.string().nullable().optional(),
-  alternate_phone: z.string().nullable().optional(),
+  alternate_phone: phoneSchema.nullable().optional(),
   email: z.string().email().nullable().optional().or(z.literal("")),
   gst_number: z.string().nullable().optional(),
   address: z.string().nullable().optional(),

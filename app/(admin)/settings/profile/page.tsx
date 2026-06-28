@@ -1,5 +1,6 @@
 import { MyProfileForm, type MyProfileFormValue } from "@/components/my-profile-form";
 import { SettingsTabs } from "@/components/settings-tabs";
+import { getAdminEmail } from "@/lib/auth/session";
 import { requireUser } from "@/lib/supabase/server";
 
 type SearchParams = Record<string, string | string[] | undefined>;
@@ -33,17 +34,18 @@ export default async function ProfileSettingsPage({
       profilePhotoUrl: data.profile_photo_url
     };
   } else {
+    const adminEmail = getAdminEmail().trim().toLowerCase() || user.email.toLowerCase();
     const { data, error } = await supabase
       .from("profiles")
       .select("full_name, phone_number, branch_location, profile_photo_url")
-      .eq("email", user.email.toLowerCase())
+      .eq("email", adminEmail)
       .maybeSingle();
     if (error) throw new Error(error.message);
 
     profile = {
       name: data?.full_name || user.name,
       phoneNumber: data?.phone_number || "",
-      email: user.email,
+      email: adminEmail,
       role: user.role,
       branchLocation: data?.branch_location || "",
       profilePhotoUrl: data?.profile_photo_url || user.profilePhotoUrl || null

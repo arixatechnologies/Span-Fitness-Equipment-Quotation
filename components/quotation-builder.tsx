@@ -4,6 +4,7 @@ import Image from "next/image";
 import { useMemo, useState } from "react";
 import { ChevronDown, Plus, Trash2 } from "lucide-react";
 import { saveQuotationAction } from "@/app/actions/quotations";
+import { PhoneInput } from "@/components/phone-input";
 import { RequiredMark } from "@/components/required-mark";
 import { StateCitySelects } from "@/components/state-city-selects";
 import { SubmitButton } from "@/components/submit-button";
@@ -476,10 +477,10 @@ export function QuotationBuilder({
                 Phone
                 <RequiredMark />
               </span>
-              <input
-                className="field-input"
+              <PhoneInput
                 name="new_phone"
                 defaultValue={snapshot?.phone || ""}
+                autoComplete="tel"
                 required={customerMode === "new"}
               />
             </label>
@@ -508,10 +509,10 @@ export function QuotationBuilder({
             </label>
             <label>
               <span className="field-label">Alternate Phone Number</span>
-              <input
-                className="field-input"
+              <PhoneInput
                 name="new_alternate_phone"
                 defaultValue={snapshot?.alternate_phone || ""}
+                autoComplete="tel"
               />
             </label>
             <label>

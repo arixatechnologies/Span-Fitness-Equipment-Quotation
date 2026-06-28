@@ -5,6 +5,8 @@ import { createQuotationExcel } from "@/lib/quotation-excel";
 import { requireUser } from "@/lib/supabase/server";
 import type { Customer } from "@/lib/types";
 
+export const runtime = "nodejs";
+
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
 
@@ -16,7 +18,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
       formatCustomerName(customer),
       quotation.quote_number
     )}.xlsx`;
-    const workbook = createQuotationExcel(quotation, items);
+    const workbook = await createQuotationExcel(quotation, items);
 
     await logActivity(supabase, {
       userId: user.id,

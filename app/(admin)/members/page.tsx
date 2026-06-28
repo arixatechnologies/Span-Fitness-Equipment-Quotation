@@ -5,6 +5,7 @@ import {
   toggleMemberStatusAction
 } from "@/app/actions/members";
 import { MemberPhotoInput } from "@/components/member-photo-input";
+import { PhoneInput } from "@/components/phone-input";
 import { RequiredMark } from "@/components/required-mark";
 import { SubmitButton } from "@/components/submit-button";
 import { StatusBadge } from "@/components/ui";
@@ -69,12 +70,9 @@ export default async function MembersPage() {
               Phone Number
               <RequiredMark />
             </span>
-            <input
+            <PhoneInput
               id="member-phone"
-              className="field-input"
               name="phone_number"
-              type="tel"
-              inputMode="tel"
               autoComplete="tel"
               required
             />

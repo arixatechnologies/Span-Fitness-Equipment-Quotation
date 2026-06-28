@@ -1,5 +1,6 @@
 import { GST_MODES } from "@/lib/constants";
 import { saveCompanySettingsAction } from "@/app/actions/settings";
+import { PhoneInput } from "@/components/phone-input";
 import { RequiredMark } from "@/components/required-mark";
 import { SubmitButton } from "@/components/submit-button";
 import type { CompanySettings } from "@/lib/types";
@@ -39,10 +40,10 @@ export function SettingsForm({
           </label>
           <label>
             <span className="field-label">Phone Numbers</span>
-            <input
-              className="field-input"
+            <PhoneInput
               name="phone_numbers"
               defaultValue={settings.phone_numbers}
+              multipleNumbers
             />
           </label>
           <label>

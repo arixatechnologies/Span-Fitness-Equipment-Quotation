@@ -1,6 +1,7 @@
 import { Save } from "lucide-react";
 import { saveMyProfileAction } from "@/app/actions/profile";
 import { MemberPhotoInput } from "@/components/member-photo-input";
+import { PhoneInput } from "@/components/phone-input";
 import { RequiredMark } from "@/components/required-mark";
 import { SubmitButton } from "@/components/submit-button";
 import type { TeamMemberRole } from "@/lib/types";
@@ -55,13 +56,11 @@ export function MyProfileForm({
         </label>
         <label htmlFor="profile-phone">
           <span className="field-label">Phone Number</span>
-          <input
+          <PhoneInput
             id="profile-phone"
-            className="field-input"
             name="phone_number"
-            type="tel"
-            inputMode="tel"
             defaultValue={profile.phoneNumber}
+            autoComplete="tel"
           />
         </label>
         <label htmlFor="profile-email">

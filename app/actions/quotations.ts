@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { calculateQuotation } from "@/lib/calculations";
 import { getCompanySettings, getQuotationWithItems, logActivity } from "@/lib/data";
+import { isTenDigitPhone, PHONE_VALIDATION_MESSAGE } from "@/lib/phone";
 import { makeQuoteNumber, generateBaseQuoteNumber } from "@/lib/quotation-number";
 import { requireUser } from "@/lib/supabase/server";
 import type { Customer, GstMode, QuotationItemInput, QuotationStatus } from "@/lib/types";
@@ -33,6 +34,7 @@ const quotationStatusSchema = z.enum([
   "Rejected",
   "Cancelled"
 ]);
+const phoneSchema = z.string().trim().refine(isTenDigitPhone, PHONE_VALIDATION_MESSAGE);
 
 function clean(value: FormDataEntryValue | null) {
   const text = String(value || "").trim();
@@ -51,9 +53,9 @@ async function resolveCustomer(supabase: any, formData: FormData) {
   const payload = {
     customer_name: z.string().min(1).parse(String(formData.get("new_customer_name") || "").trim()),
     business_name: clean(formData.get("new_business_name")),
-    phone: z.string().min(1).parse(String(formData.get("new_phone") || "").trim()),
+    phone: phoneSchema.parse(String(formData.get("new_phone") || "")),
     suffix: clean(formData.get("new_suffix")),
-    alternate_phone: clean(formData.get("new_alternate_phone")),
+    alternate_phone: phoneSchema.nullable().parse(clean(formData.get("new_alternate_phone"))),
     email: clean(formData.get("new_email")),
     gst_number: clean(formData.get("new_gst_number")),
     address: clean(formData.get("new_address")),

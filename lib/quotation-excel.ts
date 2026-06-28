@@ -1,162 +1,68 @@
-import type { Customer, Quotation, QuotationItem } from "@/lib/types";
+import { readFile } from "node:fs/promises";
+import path from "node:path";
+import ExcelJS, {
+  type Alignment,
+  type Borders,
+  type Cell,
+  type CellValue,
+  type Fill,
+  type Font,
+  type Image as ExcelJsImage,
+  type Worksheet
+} from "exceljs";
 import { formatCustomerName } from "@/lib/format";
+import type {
+  CompanySettings,
+  Customer,
+  Quotation,
+  QuotationItem
+} from "@/lib/types";
 
-type WorkbookFile = {
-  name: string;
-  data: Buffer;
+type WorkbookImage = {
+  buffer: Buffer;
+  extension: "png" | "jpeg" | "gif";
 };
 
-type Cell = {
-  value?: string | number | null;
-  style?: number;
+type CellStyle = {
+  alignment?: Partial<Alignment>;
+  border?: Partial<Borders>;
+  fill?: Fill;
+  font?: Partial<Font>;
+  numFmt?: string;
 };
 
-const CRC_TABLE = Array.from({ length: 256 }, (_, index) => {
-  let value = index;
+const BLACK = "FF000000";
+const DARK_RED = "FF9F0F16";
+const LIGHT_RED = "FFFFE3E3";
+const WHITE = "FFFFFFFF";
+const CURRENCY_FORMAT = '[$₹-en-IN]#,##0';
+const INTEGER_FORMAT = "#,##0";
+const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
 
-  for (let bit = 0; bit < 8; bit += 1) {
-    value = value & 1 ? 0xedb88320 ^ (value >>> 1) : value >>> 1;
-  }
+const thinBlackBorder: Partial<Borders> = {
+  top: { style: "thin", color: { argb: BLACK } },
+  left: { style: "thin", color: { argb: BLACK } },
+  bottom: { style: "thin", color: { argb: BLACK } },
+  right: { style: "thin", color: { argb: BLACK } }
+};
 
-  return value >>> 0;
-});
+const bottomBlackBorder: Partial<Borders> = {
+  bottom: { style: "thin", color: { argb: BLACK } }
+};
 
-function crc32(data: Buffer) {
-  let crc = 0xffffffff;
-
-  for (const byte of data) {
-    crc = CRC_TABLE[(crc ^ byte) & 0xff] ^ (crc >>> 8);
-  }
-
-  return (crc ^ 0xffffffff) >>> 0;
-}
-
-function zipWorkbook(files: WorkbookFile[]) {
-  const localParts: Buffer[] = [];
-  const centralParts: Buffer[] = [];
-  let offset = 0;
-  const now = new Date();
-  const dosTime =
-    (now.getHours() << 11) | (now.getMinutes() << 5) | Math.floor(now.getSeconds() / 2);
-  const dosDate =
-    (Math.max(now.getFullYear(), 1980) - 1980) * 512 +
-    (now.getMonth() + 1) * 32 +
-    now.getDate();
-
-  for (const file of files) {
-    const name = Buffer.from(file.name, "utf8");
-    const checksum = crc32(file.data);
-    const localHeader = Buffer.alloc(30);
-    localHeader.writeUInt32LE(0x04034b50, 0);
-    localHeader.writeUInt16LE(20, 4);
-    localHeader.writeUInt16LE(0, 6);
-    localHeader.writeUInt16LE(0, 8);
-    localHeader.writeUInt16LE(dosTime, 10);
-    localHeader.writeUInt16LE(dosDate, 12);
-    localHeader.writeUInt32LE(checksum, 14);
-    localHeader.writeUInt32LE(file.data.length, 18);
-    localHeader.writeUInt32LE(file.data.length, 22);
-    localHeader.writeUInt16LE(name.length, 26);
-    localHeader.writeUInt16LE(0, 28);
-
-    const localRecord = Buffer.concat([localHeader, name, file.data]);
-    localParts.push(localRecord);
-
-    const centralHeader = Buffer.alloc(46);
-    centralHeader.writeUInt32LE(0x02014b50, 0);
-    centralHeader.writeUInt16LE(20, 4);
-    centralHeader.writeUInt16LE(20, 6);
-    centralHeader.writeUInt16LE(0, 8);
-    centralHeader.writeUInt16LE(0, 10);
-    centralHeader.writeUInt16LE(dosTime, 12);
-    centralHeader.writeUInt16LE(dosDate, 14);
-    centralHeader.writeUInt32LE(checksum, 16);
-    centralHeader.writeUInt32LE(file.data.length, 20);
-    centralHeader.writeUInt32LE(file.data.length, 24);
-    centralHeader.writeUInt16LE(name.length, 28);
-    centralHeader.writeUInt16LE(0, 30);
-    centralHeader.writeUInt16LE(0, 32);
-    centralHeader.writeUInt16LE(0, 34);
-    centralHeader.writeUInt16LE(0, 36);
-    centralHeader.writeUInt32LE(0, 38);
-    centralHeader.writeUInt32LE(offset, 42);
-    centralParts.push(Buffer.concat([centralHeader, name]));
-
-    offset += localRecord.length;
-  }
-
-  const centralDirectory = Buffer.concat(centralParts);
-  const endRecord = Buffer.alloc(22);
-  endRecord.writeUInt32LE(0x06054b50, 0);
-  endRecord.writeUInt16LE(0, 4);
-  endRecord.writeUInt16LE(0, 6);
-  endRecord.writeUInt16LE(files.length, 8);
-  endRecord.writeUInt16LE(files.length, 10);
-  endRecord.writeUInt32LE(centralDirectory.length, 12);
-  endRecord.writeUInt32LE(offset, 16);
-  endRecord.writeUInt16LE(0, 20);
-
-  return Buffer.concat([...localParts, centralDirectory, endRecord]);
-}
-
-function escapeXml(value: string) {
-  return value
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&apos;");
-}
-
-function columnName(index: number) {
-  let name = "";
-  let value = index;
-
-  while (value > 0) {
-    const remainder = (value - 1) % 26;
-    name = String.fromCharCode(65 + remainder) + name;
-    value = Math.floor((value - 1) / 26);
-  }
-
-  return name;
-}
-
-function worksheetRow(rowNumber: number, cells: Cell[], height?: number) {
-  const attributes = height ? ` ht="${height}" customHeight="1"` : "";
-  const content = cells
-    .map((cell, index) => {
-      if (cell.value === null || cell.value === undefined || cell.value === "") return "";
-
-      const reference = `${columnName(index + 1)}${rowNumber}`;
-      const style = cell.style === undefined ? "" : ` s="${cell.style}"`;
-
-      if (typeof cell.value === "number") {
-        const value = Number.isFinite(cell.value) ? cell.value : 0;
-        return `<c r="${reference}"${style}><v>${value}</v></c>`;
-      }
-
-      return `<c r="${reference}"${style} t="inlineStr"><is><t xml:space="preserve">${escapeXml(
-        cell.value
-      )}</t></is></c>`;
-    })
-    .join("");
-
-  return `<row r="${rowNumber}"${attributes}>${content}</row>`;
-}
+const whiteFill: Fill = {
+  type: "pattern",
+  pattern: "solid",
+  fgColor: { argb: WHITE }
+};
 
 function text(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
 }
 
-function customerAddress(customer: Partial<Customer>) {
-  return [
-    text(customer.address),
-    text(customer.city),
-    text(customer.state),
-    text(customer.pincode)
-  ]
-    .filter(Boolean)
-    .join(", ");
+function amount(value: unknown) {
+  const numericValue = Number(value || 0);
+  return Number.isFinite(numericValue) ? numericValue : 0;
 }
 
 function formatDateForSheet(value: string) {
@@ -171,278 +77,673 @@ function formatDateForSheet(value: string) {
   }).format(date);
 }
 
-function createWorksheet(
-  quotation: Quotation,
-  items: QuotationItem[],
-  customer: Partial<Customer>
-) {
-  const rows: string[] = [];
-  const merges = ["A1:J1", "B4:C4", "H4:J4", "B5:J5"];
-  let row = 1;
+function customerAddress(customer: Partial<Customer>) {
+  const parts = [
+    ...text(customer.address).split(","),
+    text(customer.city),
+    text(customer.state),
+    text(customer.pincode)
+  ]
+    .map((part) => part.trim())
+    .filter(Boolean);
+  const seen = new Set<string>();
 
-  rows.push(
-    worksheetRow(row++, [{ value: "SPAN FITNESS EQUIPMENTS - QUOTATION", style: 1 }], 28)
-  );
-  rows.push(worksheetRow(row++, []));
-  rows.push(
-    worksheetRow(row++, [
-      { value: "Quotation No", style: 2 },
-      { value: quotation.quote_number, style: 6 },
-      {},
-      { value: "Quotation Date", style: 2 },
-      { value: formatDateForSheet(quotation.quote_date), style: 6 },
-      {},
-      { value: "Status", style: 2 },
-      { value: quotation.status, style: 6 }
-    ])
-  );
-  rows.push(
-    worksheetRow(row++, [
-      { value: "Customer", style: 2 },
-      { value: formatCustomerName(customer), style: 6 },
-      {},
-      { value: "Phone", style: 2 },
-      { value: text(customer.phone), style: 6 },
-      {},
-      { value: "Email", style: 2 },
-      { value: text(customer.email), style: 6 }
-    ])
-  );
-  rows.push(
-    worksheetRow(
-      row++,
-      [
-        { value: "Address", style: 2 },
-        { value: customerAddress(customer), style: 11 }
-      ],
-      30
-    )
-  );
-  rows.push(worksheetRow(row++, []));
-  rows.push(
-    worksheetRow(
-      row++,
-      [
-        { value: "#", style: 3 },
-        { value: "Product ID", style: 3 },
-        { value: "Product Name", style: 3 },
-        { value: "Brand", style: 3 },
-        { value: "Unit Price", style: 3 },
-        { value: "Discount (%)", style: 3 },
-        { value: "Quote Price", style: 3 },
-        { value: "Quantity", style: 3 },
-        { value: "GST (%)", style: 3 },
-        { value: "Total Amount", style: 3 }
-      ],
-      24
-    )
-  );
-
-  for (const [index, item] of items.entries()) {
-    const unitPrice = Number(item.unit_price) || 0;
-    const quotePrice = Number(item.special_price) || 0;
-    const discount = unitPrice > 0 ? ((unitPrice - quotePrice) / unitPrice) * 100 : 0;
-
-    rows.push(
-      worksheetRow(
-        row++,
-        [
-          { value: index + 1, style: 7 },
-          { value: item.sku, style: 6 },
-          { value: item.product_name, style: 11 },
-          { value: item.brand_name, style: 6 },
-          { value: unitPrice, style: 4 },
-          { value: discount, style: 5 },
-          { value: quotePrice, style: 4 },
-          { value: Number(item.qty) || 0, style: 7 },
-          { value: Number(item.gst_percent) || 0, style: 5 },
-          { value: Number(item.special_total) || 0, style: 4 }
-        ],
-        30
-      )
-    );
-  }
-
-  row += 1;
-  const summaryStart = row;
-  const summaryRows: Array<[string, number]> = [
-    ["Total List Price", Number(quotation.total_list_price) || 0],
-    ["Discount Value", Number(quotation.discount_amount) || 0],
-    ["Total Quote Price", Number(quotation.total_special_price) || 0],
-    ["GST Value", Number(quotation.gst_amount) || 0],
-    ["Round Off", Number(quotation.round_off) || 0],
-    ["Grand Total", Number(quotation.grand_total) || 0]
-  ];
-
-  for (const [index, [label, value]] of summaryRows.entries()) {
-    const isGrandTotal = index === summaryRows.length - 1;
-    merges.push(`I${row}:J${row}`);
-    rows.push(
-      worksheetRow(row++, [
-        {},
-        {},
-        {},
-        {},
-        {},
-        {},
-        {},
-        { value: label, style: isGrandTotal ? 10 : 8 },
-        { value, style: isGrandTotal ? 10 : 9 }
-      ])
-    );
-  }
-
-  const details = [
-    ["Warranty", quotation.warranty_note],
-    ["Delivery", quotation.delivery_note],
-    ["Transportation", quotation.transportation_note],
-    ["Payment Terms", quotation.payment_terms],
-    ["Terms and Conditions", quotation.terms]
-  ].filter(([, value]) => text(value));
-
-  if (details.length > 0) {
-    row += 1;
-    merges.push(`A${row}:J${row}`);
-    rows.push(worksheetRow(row++, [{ value: "Terms and Conditions", style: 1 }], 24));
-
-    for (const [label, value] of details) {
-      merges.push(`B${row}:J${row}`);
-      rows.push(
-        worksheetRow(
-          row++,
-          [
-            { value: label, style: 2 },
-            { value: text(value), style: 11 }
-          ],
-          34
-        )
-      );
-    }
-  }
-
-  const lastRow = Math.max(row - 1, summaryStart + summaryRows.length - 1);
-
-  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
-  <dimension ref="A1:J${lastRow}"/>
-  <sheetViews><sheetView workbookViewId="0"><pane ySplit="7" topLeftCell="A8" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews>
-  <sheetFormatPr defaultRowHeight="18"/>
-  <cols>
-    <col min="1" max="1" width="6" customWidth="1"/>
-    <col min="2" max="2" width="18" customWidth="1"/>
-    <col min="3" max="3" width="38" customWidth="1"/>
-    <col min="4" max="4" width="18" customWidth="1"/>
-    <col min="5" max="5" width="16" customWidth="1"/>
-    <col min="6" max="6" width="14" customWidth="1"/>
-    <col min="7" max="7" width="16" customWidth="1"/>
-    <col min="8" max="8" width="11" customWidth="1"/>
-    <col min="9" max="9" width="11" customWidth="1"/>
-    <col min="10" max="10" width="18" customWidth="1"/>
-  </cols>
-  <sheetData>${rows.join("")}</sheetData>
-  <mergeCells count="${merges.length}">${merges
-    .map((reference) => `<mergeCell ref="${reference}"/>`)
-    .join("")}</mergeCells>
-  <autoFilter ref="A7:J${Math.max(7, 7 + items.length)}"/>
-  <pageMargins left="0.25" right="0.25" top="0.5" bottom="0.5" header="0.2" footer="0.2"/>
-  <pageSetup orientation="landscape" fitToWidth="1" fitToHeight="0"/>
-</worksheet>`;
+  return parts
+    .filter((part) => {
+      const normalized = part.toLowerCase().replace(/\s+/g, " ");
+      if (seen.has(normalized)) return false;
+      seen.add(normalized);
+      return true;
+    })
+    .join(", ");
 }
 
-const STYLES_XML = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
-  <numFmts count="2">
-    <numFmt numFmtId="164" formatCode="&quot;₹&quot;#,##0.00"/>
-    <numFmt numFmtId="165" formatCode="0.00&quot;%&quot;"/>
-  </numFmts>
-  <fonts count="4">
-    <font><sz val="11"/><name val="Calibri"/><family val="2"/></font>
-    <font><b/><sz val="11"/><name val="Calibri"/><family val="2"/></font>
-    <font><b/><color rgb="FFFFFFFF"/><sz val="15"/><name val="Calibri"/><family val="2"/></font>
-    <font><b/><color rgb="FFFFFFFF"/><sz val="11"/><name val="Calibri"/><family val="2"/></font>
-  </fonts>
-  <fills count="4">
-    <fill><patternFill patternType="none"/></fill>
-    <fill><patternFill patternType="gray125"/></fill>
-    <fill><patternFill patternType="solid"><fgColor rgb="FF93B5C6"/><bgColor indexed="64"/></patternFill></fill>
-    <fill><patternFill patternType="solid"><fgColor rgb="FFD71920"/><bgColor indexed="64"/></patternFill></fill>
-  </fills>
-  <borders count="2">
-    <border><left/><right/><top/><bottom/><diagonal/></border>
-    <border>
-      <left style="thin"><color rgb="FFC9CCD5"/></left>
-      <right style="thin"><color rgb="FFC9CCD5"/></right>
-      <top style="thin"><color rgb="FFC9CCD5"/></top>
-      <bottom style="thin"><color rgb="FFC9CCD5"/></bottom>
-      <diagonal/>
-    </border>
-  </borders>
-  <cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>
-  <cellXfs count="12">
-    <xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>
-    <xf numFmtId="0" fontId="2" fillId="3" borderId="0" xfId="0" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>
-    <xf numFmtId="0" fontId="1" fillId="2" borderId="1" xfId="0" applyAlignment="1"><alignment vertical="center"/></xf>
-    <xf numFmtId="0" fontId="3" fillId="3" borderId="1" xfId="0" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>
-    <xf numFmtId="164" fontId="0" fillId="0" borderId="1" xfId="0" applyNumberFormat="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf>
-    <xf numFmtId="165" fontId="0" fillId="0" borderId="1" xfId="0" applyNumberFormat="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf>
-    <xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyAlignment="1"><alignment vertical="center"/></xf>
-    <xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>
-    <xf numFmtId="0" fontId="1" fillId="2" borderId="1" xfId="0" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf>
-    <xf numFmtId="164" fontId="1" fillId="0" borderId="1" xfId="0" applyNumberFormat="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf>
-    <xf numFmtId="164" fontId="3" fillId="3" borderId="1" xfId="0" applyNumberFormat="1" applyAlignment="1"><alignment horizontal="right" vertical="center"/></xf>
-    <xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyAlignment="1"><alignment vertical="center" wrapText="1"/></xf>
-  </cellXfs>
-  <cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>
-</styleSheet>`;
+function productBrand(item: QuotationItem, settings: CompanySettings) {
+  const brand = text(item.brand_name);
+  if (/welcare/i.test(brand)) return settings.company_name;
+  return brand || "SPAN";
+}
 
-export function createQuotationExcel(quotation: Quotation, items: QuotationItem[]) {
-  const customer = quotation.customer_snapshot as Partial<Customer>;
-  const worksheet = createWorksheet(quotation, items, customer);
-  const files: WorkbookFile[] = [
-    {
-      name: "[Content_Types].xml",
-      data: Buffer.from(`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
-  <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
-  <Default Extension="xml" ContentType="application/xml"/>
-  <Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>
-  <Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>
-  <Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>
-</Types>`)
-    },
-    {
-      name: "_rels/.rels",
-      data: Buffer.from(`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
-  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>
-</Relationships>`)
-    },
-    {
-      name: "xl/workbook.xml",
-      data: Buffer.from(`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
-  <bookViews><workbookView xWindow="0" yWindow="0" windowWidth="24000" windowHeight="12000"/></bookViews>
-  <sheets><sheet name="Quotation" sheetId="1" r:id="rId1"/></sheets>
-  <calcPr calcId="191029"/>
-</workbook>`)
-    },
-    {
-      name: "xl/_rels/workbook.xml.rels",
-      data: Buffer.from(`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
-  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>
-  <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>
-</Relationships>`)
-    },
-    {
-      name: "xl/worksheets/sheet1.xml",
-      data: Buffer.from(worksheet)
-    },
-    {
-      name: "xl/styles.xml",
-      data: Buffer.from(STYLES_XML)
+function productDescription(item: QuotationItem) {
+  return [
+    text(item.description),
+    text(item.dimensions) ? `Dimensions : ${text(item.dimensions)}` : "",
+    text(item.machine_weight) ? `Machine Weight : ${text(item.machine_weight)}` : "",
+    text(item.stack_weight) ? `Stack Weight : ${text(item.stack_weight)}` : "",
+    text(item.specifications)
+  ]
+    .filter(Boolean)
+    .join("\n");
+}
+
+function gstText(quotation: Quotation) {
+  if (quotation.gst_mode === "included") return "* GST Included.";
+  if (quotation.gst_mode === "none") return "* No GST.";
+  return "* GST Extra.";
+}
+
+function signerDetails(settings: CompanySettings) {
+  const name =
+    settings.authorized_person_name === "Authorized Signatory"
+      ? "A Senthil Kumar"
+      : settings.authorized_person_name || "A Senthil Kumar";
+  const designation = /^for\s+/i.test(settings.authorized_person_designation)
+    ? "National Head"
+    : settings.authorized_person_designation || "National Head";
+
+  return { name, designation };
+}
+
+function applyStyle(cell: Cell, style: CellStyle) {
+  if (style.font) cell.font = style.font;
+  if (style.fill) cell.fill = style.fill;
+  if (style.border) cell.border = style.border;
+  if (style.alignment) cell.alignment = style.alignment;
+  if (style.numFmt) cell.numFmt = style.numFmt;
+}
+
+function styleRange(
+  worksheet: Worksheet,
+  startRow: number,
+  startColumn: number,
+  endRow: number,
+  endColumn: number,
+  style: CellStyle
+) {
+  for (let row = startRow; row <= endRow; row += 1) {
+    for (let column = startColumn; column <= endColumn; column += 1) {
+      applyStyle(worksheet.getCell(row, column), style);
     }
+  }
+}
+
+function setMergedCell(
+  worksheet: Worksheet,
+  row: number,
+  startColumn: number,
+  endColumn: number,
+  value: CellValue,
+  style: CellStyle = {}
+) {
+  if (endColumn > startColumn) {
+    worksheet.mergeCells(row, startColumn, row, endColumn);
+  }
+
+  const cell = worksheet.getCell(row, startColumn);
+  cell.value = value;
+  styleRange(worksheet, row, startColumn, row, endColumn, style);
+  return cell;
+}
+
+function estimateSectionHeight(value: string) {
+  const explicitLines = Math.max(1, value.split(/\r?\n/).length);
+  const wrappedLines = Math.max(1, Math.ceil(value.length / 115));
+  return Math.max(30, 19 + Math.max(explicitLines, wrappedLines) * 14);
+}
+
+function imageExtension(buffer: Buffer): WorkbookImage["extension"] | null {
+  if (
+    buffer.length >= 8 &&
+    buffer[0] === 0x89 &&
+    buffer[1] === 0x50 &&
+    buffer[2] === 0x4e &&
+    buffer[3] === 0x47
+  ) {
+    return "png";
+  }
+
+  if (buffer.length >= 3 && buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff) {
+    return "jpeg";
+  }
+
+  if (buffer.length >= 6 && buffer.subarray(0, 3).toString("ascii") === "GIF") {
+    return "gif";
+  }
+
+  return null;
+}
+
+function isBlockedImageHost(hostname: string) {
+  const host = hostname.toLowerCase().replace(/^\[|\]$/g, "");
+  if (host === "localhost" || host === "::1" || host.endsWith(".local")) return true;
+  if (/^127\./.test(host) || /^10\./.test(host) || /^192\.168\./.test(host)) return true;
+  if (/^169\.254\./.test(host)) return true;
+
+  const private172 = host.match(/^172\.(\d{1,3})\./);
+  if (private172 && Number(private172[1]) >= 16 && Number(private172[1]) <= 31) return true;
+
+  return /^(fc|fd|fe80):/i.test(host);
+}
+
+async function loadProductImage(imageUrl: string): Promise<WorkbookImage | null> {
+  try {
+    const dataImage = imageUrl.match(
+      /^data:image\/(png|jpe?g|gif);base64,([a-z0-9+/=\s]+)$/i
+    );
+
+    if (dataImage) {
+      const buffer = Buffer.from(dataImage[2].replace(/\s/g, ""), "base64");
+      if (buffer.length > MAX_IMAGE_BYTES) return null;
+      const extension = imageExtension(buffer);
+      return extension ? { buffer, extension } : null;
+    }
+
+    const url = new URL(imageUrl);
+    if (!["http:", "https:"].includes(url.protocol) || isBlockedImageHost(url.hostname)) {
+      return null;
+    }
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 6000);
+
+    try {
+      const response = await fetch(url, {
+        cache: "no-store",
+        redirect: "follow",
+        signal: controller.signal
+      });
+      if (!response.ok) return null;
+
+      const declaredLength = Number(response.headers.get("content-length") || 0);
+      if (declaredLength > MAX_IMAGE_BYTES) return null;
+
+      const buffer = Buffer.from(await response.arrayBuffer());
+      if (!buffer.length || buffer.length > MAX_IMAGE_BYTES) return null;
+
+      const extension = imageExtension(buffer);
+      return extension ? { buffer, extension } : null;
+    } finally {
+      clearTimeout(timeout);
+    }
+  } catch {
+    return null;
+  }
+}
+
+async function loadProductImages(items: QuotationItem[]) {
+  const urls = Array.from(
+    new Set(items.map((item) => text(item.image_url)).filter(Boolean))
+  );
+  const entries = await Promise.all(
+    urls.map(async (url) => [url, await loadProductImage(url)] as const)
+  );
+
+  return new Map(entries);
+}
+
+async function loadPdfAsset(filename: string): Promise<WorkbookImage | null> {
+  try {
+    const buffer = await readFile(path.join(process.cwd(), "public", "pdf", filename));
+    const extension = imageExtension(buffer);
+    return extension ? { buffer, extension } : null;
+  } catch {
+    return null;
+  }
+}
+
+function registerImage(workbook: ExcelJS.Workbook, image: WorkbookImage) {
+  return workbook.addImage(image as unknown as ExcelJsImage);
+}
+
+function addBanner(
+  workbook: ExcelJS.Workbook,
+  worksheet: Worksheet,
+  image: WorkbookImage | null,
+  startRow: number,
+  endRow: number
+) {
+  worksheet.mergeCells(startRow, 1, endRow, 7);
+  for (let row = startRow; row <= endRow; row += 1) {
+    worksheet.getRow(row).height = 31;
+  }
+
+  if (!image) return;
+
+  const imageId = registerImage(workbook, image);
+  worksheet.addImage(imageId, `A${startRow}:G${endRow}`);
+}
+
+function addSection(
+  worksheet: Worksheet,
+  row: number,
+  heading: string,
+  value: string,
+  options: { borderBottom?: boolean } = {}
+) {
+  const content = value || "-";
+  worksheet.getRow(row).height = estimateSectionHeight(content);
+  const cell = setMergedCell(
+    worksheet,
+    row,
+    1,
+    7,
+    {
+      richText: [
+        {
+          font: { name: "Georgia", size: 10, bold: true, color: { argb: BLACK } },
+          text: `${heading}:\n`
+        },
+        {
+          font: { name: "Georgia", size: 10, color: { argb: BLACK } },
+          text: content
+        }
+      ]
+    },
+    {
+      alignment: { vertical: "top", wrapText: true },
+      border: options.borderBottom ? bottomBlackBorder : undefined,
+      fill: whiteFill
+    }
+  );
+  cell.protection = { locked: true };
+}
+
+function addProductRows(
+  workbook: ExcelJS.Workbook,
+  worksheet: Worksheet,
+  items: QuotationItem[],
+  settings: CompanySettings,
+  productImages: Map<string, WorkbookImage | null>,
+  startRow: number
+) {
+  const headers = [
+    "#",
+    "Product",
+    "Description",
+    "Unit Price\n(₹)",
+    "Special Price\n(₹)",
+    "Qty",
+    "Total\n(₹)"
+  ];
+  const headerRow = worksheet.getRow(startRow);
+  headerRow.height = 34;
+
+  headers.forEach((header, index) => {
+    const cell = headerRow.getCell(index + 1);
+    cell.value = header;
+    applyStyle(cell, {
+      alignment: { horizontal: "center", vertical: "middle", wrapText: true },
+      border: thinBlackBorder,
+      fill: whiteFill,
+      font: { name: "Georgia", size: 9, bold: true, color: { argb: BLACK } }
+    });
+  });
+
+  let row = startRow + 1;
+
+  items.forEach((item, index) => {
+    const itemRow = worksheet.getRow(row);
+    itemRow.height = 92;
+    const description = productDescription(item);
+    const brand = productBrand(item, settings);
+    const image = productImages.get(text(item.image_url)) || null;
+
+    itemRow.getCell(1).value = index + 1;
+    itemRow.getCell(2).value = image
+      ? brand
+      : {
+          richText: [
+            {
+              font: { name: "Georgia", size: 11, bold: true, color: { argb: DARK_RED } },
+              text: "SFE\n\n"
+            },
+            {
+              font: { name: "Georgia", size: 8, bold: true, color: { argb: BLACK } },
+              text: brand
+            }
+          ]
+        };
+    itemRow.getCell(3).value = {
+      richText: [
+        {
+          font: { name: "Georgia", size: 10, bold: true, color: { argb: BLACK } },
+          text: item.product_name
+        },
+        ...(description
+          ? [
+              {
+                font: { name: "Georgia", size: 9, color: { argb: BLACK } },
+                text: `\n\n${description}`
+              }
+            ]
+          : [])
+      ]
+    };
+    itemRow.getCell(4).value = amount(item.unit_price);
+    itemRow.getCell(5).value = amount(item.special_price);
+    itemRow.getCell(6).value = amount(item.qty);
+    itemRow.getCell(7).value = amount(item.line_total);
+
+    styleRange(worksheet, row, 1, row, 7, {
+      alignment: { vertical: "top", wrapText: true },
+      border: thinBlackBorder,
+      fill: whiteFill,
+      font: { name: "Arial", size: 9, color: { argb: BLACK } }
+    });
+    itemRow.getCell(1).alignment = { horizontal: "center", vertical: "top" };
+    itemRow.getCell(2).alignment = {
+      horizontal: "center",
+      vertical: image ? "bottom" : "middle",
+      wrapText: true
+    };
+    itemRow.getCell(3).alignment = { vertical: "top", wrapText: true };
+
+    [4, 5, 7].forEach((column) => {
+      itemRow.getCell(column).numFmt = CURRENCY_FORMAT;
+      itemRow.getCell(column).alignment = { horizontal: "right", vertical: "top" };
+    });
+    itemRow.getCell(6).numFmt = INTEGER_FORMAT;
+    itemRow.getCell(6).alignment = { horizontal: "center", vertical: "top" };
+
+    if (image) {
+      const imageId = registerImage(workbook, image);
+      worksheet.addImage(imageId, {
+        tl: { col: 1.18, row: row - 0.94 },
+        ext: { width: 96, height: 88 },
+        editAs: "oneCell"
+      });
+    }
+
+    row += 1;
+  });
+
+  return row;
+}
+
+function addTotals(worksheet: Worksheet, quotation: Quotation, startRow: number) {
+  const totals: Array<[string, number]> = [
+    ["Total List Price", amount(quotation.total_list_price)],
+    ["Discount", amount(quotation.discount_amount)],
+    ["Total Special Price", amount(quotation.total_special_price)],
+    ["GST", amount(quotation.gst_amount)],
+    ["Net Total", amount(quotation.net_total)],
+    ["Round Off", amount(quotation.round_off)],
+    ["Grand Total", amount(quotation.grand_total)]
   ];
 
-  return zipWorkbook(files);
+  let row = startRow;
+
+  totals.forEach(([label, value], index) => {
+    const grandTotal = index === totals.length - 1;
+    worksheet.getRow(row).height = 23;
+    setMergedCell(worksheet, row, 4, 6, label, {
+      alignment: { vertical: "middle" },
+      border: thinBlackBorder,
+      fill: grandTotal
+        ? {
+            type: "pattern",
+            pattern: "solid",
+            fgColor: { argb: LIGHT_RED }
+          }
+        : whiteFill,
+      font: { name: "Georgia", size: 9, bold: grandTotal, color: { argb: BLACK } }
+    });
+    const valueCell = worksheet.getCell(row, 7);
+    valueCell.value = value;
+    applyStyle(valueCell, {
+      alignment: { horizontal: "right", vertical: "middle" },
+      border: thinBlackBorder,
+      fill: grandTotal
+        ? {
+            type: "pattern",
+            pattern: "solid",
+            fgColor: { argb: LIGHT_RED }
+          }
+        : whiteFill,
+      font: { name: "Arial", size: 9, bold: grandTotal, color: { argb: BLACK } },
+      numFmt: CURRENCY_FORMAT
+    });
+    row += 1;
+  });
+
+  return row;
+}
+
+export async function createQuotationExcel(
+  quotation: Quotation,
+  items: QuotationItem[]
+) {
+  const customer = quotation.customer_snapshot as Partial<Customer>;
+  const settings = quotation.company_settings_snapshot as CompanySettings;
+  const [{ header, footer }, productImages] = await Promise.all([
+    Promise.all([
+      loadPdfAsset("header-banner.png"),
+      loadPdfAsset("brands-footer.png")
+    ]).then(([header, footer]) => ({ header, footer })),
+    loadProductImages(items)
+  ]);
+
+  const workbook = new ExcelJS.Workbook();
+  workbook.creator = "Span Fitness Equipments";
+  workbook.company = settings.company_name;
+  workbook.created = new Date();
+  workbook.modified = new Date();
+  workbook.subject = `Quotation ${quotation.quote_number}`;
+  workbook.title = `${formatCustomerName(customer)} - ${quotation.quote_number}`;
+  workbook.calcProperties.fullCalcOnLoad = true;
+
+  const worksheet = workbook.addWorksheet("Quotation", {
+    pageSetup: {
+      paperSize: 9,
+      orientation: "landscape",
+      fitToPage: true,
+      fitToWidth: 1,
+      fitToHeight: 0,
+      margins: {
+        left: 0.25,
+        right: 0.25,
+        top: 0.3,
+        bottom: 0.3,
+        header: 0.1,
+        footer: 0.1
+      }
+    },
+    properties: {
+      defaultRowHeight: 18
+    },
+    views: [
+      {
+        showGridLines: false,
+        zoomScale: 80
+      }
+    ]
+  });
+
+  worksheet.columns = [
+    { key: "serial", width: 6 },
+    { key: "product", width: 21 },
+    { key: "description", width: 48 },
+    { key: "unitPrice", width: 15 },
+    { key: "specialPrice", width: 15 },
+    { key: "quantity", width: 8 },
+    { key: "total", width: 18 }
+  ];
+
+  addBanner(workbook, worksheet, header, 1, 6);
+
+  worksheet.getRow(7).height = 29;
+  setMergedCell(worksheet, 7, 1, 7, "QUOTATION", {
+    alignment: { horizontal: "center", vertical: "middle" },
+    fill: whiteFill,
+    font: { name: "Georgia", size: 15, bold: true, color: { argb: BLACK } }
+  });
+
+  worksheet.getRow(8).height = 22;
+  setMergedCell(worksheet, 8, 1, 3, "To:", {
+    alignment: { vertical: "middle" },
+    font: { name: "Georgia", size: 11, bold: true, color: { argb: BLACK } }
+  });
+  setMergedCell(
+    worksheet,
+    8,
+    5,
+    7,
+    `DATE: ${formatDateForSheet(quotation.quote_date)}`,
+    {
+      alignment: { horizontal: "right", vertical: "middle" },
+      font: { name: "Arial", size: 10, bold: true, color: { argb: BLACK } }
+    }
+  );
+
+  worksheet.getRow(9).height = 22;
+  setMergedCell(worksheet, 9, 1, 3, `${formatCustomerName(customer)},`, {
+    alignment: { vertical: "middle" },
+    font: { name: "Georgia", size: 10, bold: true, color: { argb: BLACK } }
+  });
+  setMergedCell(
+    worksheet,
+    9,
+    5,
+    7,
+    `QUOTATION NO: ${quotation.quote_number}`,
+    {
+      alignment: { horizontal: "right", vertical: "middle" },
+      font: { name: "Arial", size: 10, bold: true, color: { argb: BLACK } }
+    }
+  );
+
+  worksheet.getRow(10).height = 20;
+  setMergedCell(worksheet, 10, 1, 3, `${text(customer.phone)},`, {
+    alignment: { vertical: "middle" },
+    font: { name: "Arial", size: 10, color: { argb: BLACK } }
+  });
+
+  worksheet.getRow(11).height = estimateSectionHeight(customerAddress(customer));
+  setMergedCell(worksheet, 11, 1, 4, customerAddress(customer) || ".", {
+    alignment: { vertical: "top", wrapText: true },
+    font: { name: "Georgia", size: 10, color: { argb: BLACK } }
+  });
+
+  worksheet.getRow(12).height = 7;
+  let row = addProductRows(
+    workbook,
+    worksheet,
+    items,
+    settings,
+    productImages,
+    13
+  );
+
+  worksheet.getRow(row).height = 8;
+  row += 1;
+  row = addTotals(worksheet, quotation, row);
+  worksheet.getRow(row).height = 8;
+  row += 1;
+
+  const detailSections: Array<[string, string]> = [
+    ["Terms and Conditions", text(quotation.terms)],
+    ["Warranty", text(quotation.warranty_note)],
+    ["Delivery", text(quotation.delivery_note)],
+    ["Transportation", text(quotation.transportation_note)],
+    ["GST", gstText(quotation)],
+    ["Payment", text(quotation.payment_terms)]
+  ];
+
+  detailSections.forEach(([heading, value]) => {
+    addSection(worksheet, row, heading, value);
+    row += 1;
+  });
+
+  const bankDetails = [
+    `Firm Name - ${settings.company_name}`,
+    `Bank Name : ${settings.bank_name}`,
+    `Account No : ${settings.bank_account_no}`,
+    `Branch : ${settings.bank_branch}`,
+    `IFSC Code : ${settings.bank_ifsc}`
+  ].join("\n");
+  addSection(
+    worksheet,
+    row,
+    "Bank Details - NEFT, RTGS, UPI, IMPS",
+    bankDetails,
+    { borderBottom: true }
+  );
+  row += 1;
+
+  addSection(
+    worksheet,
+    row,
+    "After sales Support",
+    text(quotation.after_sales_support),
+    { borderBottom: true }
+  );
+  row += 1;
+
+  worksheet.getRow(row).height = 25;
+  setMergedCell(worksheet, row, 1, 7, `For ${settings.company_name}`, {
+    alignment: { vertical: "middle" },
+    font: { name: "Georgia", size: 10, bold: true, color: { argb: BLACK } }
+  });
+  row += 1;
+
+  const signer = signerDetails(settings);
+  worksheet.getRow(row).height = 40;
+  setMergedCell(
+    worksheet,
+    row,
+    1,
+    3,
+    settings.bank_branch || "Vishakhapatnam",
+    {
+      alignment: { vertical: "middle" },
+      border: bottomBlackBorder,
+      font: { name: "Georgia", size: 10, bold: true, color: { argb: BLACK } }
+    }
+  );
+  styleRange(worksheet, row, 4, row, 4, { border: bottomBlackBorder });
+  setMergedCell(
+    worksheet,
+    row,
+    5,
+    7,
+    `${signer.name}\n${signer.designation}`,
+    {
+      alignment: { horizontal: "center", vertical: "middle", wrapText: true },
+      border: bottomBlackBorder,
+      font: { name: "Georgia", size: 10, bold: true, color: { argb: BLACK } }
+    }
+  );
+  row += 1;
+
+  worksheet.getRow(row).height = 92;
+  const branchDetails = [
+    "Branch Office :",
+    settings.address,
+    `${settings.phone_numbers} | ${settings.email}`,
+    `GST NO : ${settings.gst_number}`
+  ].join("\n");
+  const primaryPhone =
+    settings.phone_numbers.split("|")[0]?.trim() || settings.phone_numbers;
+  const corporateDetails = [
+    "Corporate Office :",
+    settings.company_name,
+    settings.address,
+    "",
+    `spanfitnessequipments.in | ${primaryPhone}`
+  ].join("\n");
+  setMergedCell(worksheet, row, 1, 4, branchDetails, {
+    alignment: { vertical: "top", wrapText: true },
+    font: { name: "Georgia", size: 9, color: { argb: BLACK } }
+  });
+  setMergedCell(worksheet, row, 5, 7, corporateDetails, {
+    alignment: { vertical: "top", wrapText: true },
+    font: { name: "Georgia", size: 9, color: { argb: BLACK } }
+  });
+  worksheet.getCell(row, 1).font = {
+    name: "Georgia",
+    size: 9,
+    color: { argb: BLACK }
+  };
+  row += 2;
+
+  const footerStart = row;
+  const footerEnd = row + 4;
+  addBanner(workbook, worksheet, footer, footerStart, footerEnd);
+
+  worksheet.pageSetup.printArea = `A1:G${footerEnd}`;
+  worksheet.pageSetup.horizontalCentered = true;
+  worksheet.pageSetup.verticalCentered = false;
+
+  const output = await workbook.xlsx.writeBuffer();
+  return Buffer.from(output);
 }

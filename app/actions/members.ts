@@ -6,11 +6,12 @@ import { z } from "zod";
 import { hashMemberPassword } from "@/lib/auth/password";
 import { getAdminEmail } from "@/lib/auth/session";
 import { logActivity } from "@/lib/data";
+import { isTenDigitPhone, PHONE_VALIDATION_MESSAGE } from "@/lib/phone";
 import { requireAdmin } from "@/lib/supabase/server";
 
 const memberSchema = z.object({
   member_name: z.string().trim().min(2).max(100),
-  phone_number: z.string().trim().min(5).max(20),
+  phone_number: z.string().trim().refine(isTenDigitPhone, PHONE_VALIDATION_MESSAGE),
   email: z.string().trim().email().max(254),
   password: z.string().min(8).max(128),
   role: z.enum(["Admin", "Manager", "Sales Executive"]),

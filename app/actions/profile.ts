@@ -8,15 +8,20 @@ import { hashMemberPassword } from "@/lib/auth/password";
 import {
   ADMIN_SESSION_COOKIE,
   SESSION_MAX_AGE_SECONDS,
-  createSessionToken
+  createSessionToken,
+  getAdminEmail
 } from "@/lib/auth/session";
 import { logActivity } from "@/lib/data";
+import { isTenDigitPhone, PHONE_VALIDATION_MESSAGE } from "@/lib/phone";
 import { requireUser } from "@/lib/supabase/server";
 
 const profileSchema = z.object({
   name: z.string().trim().min(2).max(100),
   email: z.string().trim().email().max(254),
-  phoneNumber: z.string().trim().max(20),
+  phoneNumber: z
+    .string()
+    .trim()
+    .refine((value) => !value || isTenDigitPhone(value), PHONE_VALIDATION_MESSAGE),
   branchLocation: z.string().trim().max(150)
 });
 
@@ -57,11 +62,12 @@ async function uploadProfilePhoto(supabase: any, file: File | null) {
 export async function saveMyProfileAction(formData: FormData) {
   const { supabase, user } = await requireUser();
   const isMember = Boolean(user.id);
+  const accountEmail = isMember
+    ? String(formData.get("email") || "").toLowerCase()
+    : getAdminEmail().trim().toLowerCase() || user.email.toLowerCase();
   const parsed = profileSchema.parse({
     name: formData.get("name"),
-    email: isMember
-      ? String(formData.get("email") || "").toLowerCase()
-      : user.email.toLowerCase(),
+    email: accountEmail,
     phoneNumber: formData.get("phone_number"),
     branchLocation: formData.get("branch_location")
   });
@@ -96,7 +102,7 @@ export async function saveMyProfileAction(formData: FormData) {
     const { data, error } = await supabase
       .from("profiles")
       .select("id, profile_photo_url, profile_photo_path")
-      .eq("email", user.email.toLowerCase())
+      .eq("email", parsed.email)
       .maybeSingle();
     if (error) throw new Error(error.message);
     current = data;

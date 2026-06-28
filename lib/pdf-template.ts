@@ -335,16 +335,18 @@ function summaryPage({
   items,
   startIndex,
   settings,
-  chromeImages
+  chromeImages,
+  continueDetailsOnSupportPage,
+  includeAfterSalesSupport
 }: {
   quotation: Quotation;
   items: QuotationItem[];
   startIndex: number;
   settings: CompanySettings;
   chromeImages: PdfChromeImages;
+  continueDetailsOnSupportPage: boolean;
+  includeAfterSalesSupport: boolean;
 }) {
-  const useCompactDetailsGrid = items.length === 3;
-
   return `
     <section class="page page-2 summary-products-${items.length}">
       ${headerImage(chromeImages)}
@@ -359,17 +361,10 @@ function summaryPage({
             })
           : ""
       }
-      ${
-        useCompactDetailsGrid
-          ? `<div class="summary-details-grid">
-              ${totalsTable(quotation)}
-              ${termsBlock(quotation)}
-            </div>
-            ${bankBlock(settings)}`
-          : `${totalsTable(quotation)}
-            ${termsBlock(quotation)}
-            ${bankBlock(settings)}`
-      }
+      ${totalsTable(quotation)}
+      ${continueDetailsOnSupportPage ? "" : termsBlock(quotation)}
+      ${continueDetailsOnSupportPage ? "" : bankBlock(settings)}
+      ${includeAfterSalesSupport ? afterSalesBlock(quotation) : ""}
       ${footerImage(chromeImages, "page2-footer")}
     </section>
   `;
@@ -378,30 +373,37 @@ function summaryPage({
 function supportPage({
   quotation,
   settings,
-  chromeImages
+  chromeImages,
+  includeSummaryDetails,
+  includeAfterSalesSupport
 }: {
   quotation: Quotation;
   settings: CompanySettings;
   chromeImages: PdfChromeImages;
+  includeSummaryDetails: boolean;
+  includeAfterSalesSupport: boolean;
 }) {
   const phoneIconBig = iconMarkup(chromeImages.phoneIconBig, "phone");
   const phoneIcon = iconMarkup(chromeImages.phoneIcon, "phone");
   const webIcon = iconMarkup(chromeImages.webIcon, "web");
   const signerName =
     settings.authorized_person_name === "Authorized Signatory"
-      ? ""
-      : settings.authorized_person_name;
+      ? "A Senthil Kumar"
+      : settings.authorized_person_name || "A Senthil Kumar";
   const signerDesignation = /^for\s+/i.test(settings.authorized_person_designation)
-    ? ""
-    : settings.authorized_person_designation;
+    ? "National Head"
+    : settings.authorized_person_designation || "National Head";
 
   return `
     <section class="page page-3">
       ${headerImage(chromeImages)}
 
-      ${afterSalesBlock(quotation)}
+      ${includeSummaryDetails ? termsBlock(quotation) : ""}
+      ${includeSummaryDetails ? bankBlock(settings) : ""}
 
-      <div class="company-line line-bottom">
+      ${includeAfterSalesSupport ? afterSalesBlock(quotation) : ""}
+
+      <div class="company-line">
         <strong>For ${escapeHtml(settings.company_name)}</strong>
       </div>
 
@@ -421,7 +423,7 @@ function supportPage({
           <h3>Corporate Office :</h3>
           <strong>${escapeHtml(settings.company_name)}</strong><br>
           ${escapeHtml(settings.address)}<br><br>
-          <span class="icon-text">${webIcon} spanfitnessequipments.com</span>
+          <span class="icon-text">${webIcon} spanfitnessequipments.in</span>
           <span class="sep">|</span>
           <span class="icon-text">${phoneIcon} ${escapeHtml(settings.phone_numbers.split("|")[0]?.trim() || settings.phone_numbers)}</span>
         </div>
@@ -440,6 +442,9 @@ export function renderQuotationHtml({
 }: PdfTemplateInput) {
   const customer = customerFromSnapshot(quotation.customer_snapshot);
   const { first, middle, final } = splitProductPages(items);
+  const continueDetailsOnSupportPage = final.length === 3;
+  const includeAfterSalesOnSummaryPage =
+    !continueDetailsOnSupportPage && final.length <= 1;
   let nextIndex = first.length;
 
   const middlePages = middle
@@ -656,25 +661,6 @@ html, body {
 .total-table td:first-child { width: 63%; }
 .total-table td:last-child { width: 37%; }
 
-.summary-details-grid {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 69.6mm;
-  align-items: start;
-}
-
-.summary-details-grid .total-table {
-  grid-column: 2;
-  grid-row: 1;
-}
-
-.summary-details-grid .terms-block {
-  grid-column: 1;
-  grid-row: 1;
-  width: auto;
-  margin-top: 0;
-  margin-right: 6mm;
-}
-
 .terms-block {
   margin-left: 9mm;
   margin-top: 2mm;
@@ -785,11 +771,21 @@ html, body {
 <body>
   ${firstPage({ quotation, items: first, customer, settings, chromeImages })}
   ${middlePages}
-  ${summaryPage({ quotation, items: final, startIndex: nextIndex, settings, chromeImages })}
+  ${summaryPage({
+    quotation,
+    items: final,
+    startIndex: nextIndex,
+    settings,
+    chromeImages,
+    continueDetailsOnSupportPage,
+    includeAfterSalesSupport: includeAfterSalesOnSummaryPage
+  })}
   ${supportPage({
     quotation,
     settings,
-    chromeImages
+    chromeImages,
+    includeSummaryDetails: continueDetailsOnSupportPage,
+    includeAfterSalesSupport: !includeAfterSalesOnSummaryPage
   })}
 </body>
 </html>`;

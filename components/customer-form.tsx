@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { saveCustomerAction } from "@/app/actions/customers";
+import { PhoneInput } from "@/components/phone-input";
 import { RequiredMark } from "@/components/required-mark";
 import { StateCitySelects } from "@/components/state-city-selects";
 import { SubmitButton } from "@/components/submit-button";
@@ -16,7 +17,12 @@ export function CustomerForm({ customer }: { customer?: Customer }) {
             Phone
             <RequiredMark />
           </span>
-          <input className="field-input" name="phone" defaultValue={customer?.phone || ""} required />
+          <PhoneInput
+            name="phone"
+            defaultValue={customer?.phone || ""}
+            autoComplete="tel"
+            required
+          />
         </label>
         <label>
           <span className="field-label">Suffix</span>
@@ -47,10 +53,10 @@ export function CustomerForm({ customer }: { customer?: Customer }) {
         </label>
         <label>
           <span className="field-label">Alternate Phone Number</span>
-          <input
-            className="field-input"
+          <PhoneInput
             name="alternate_phone"
             defaultValue={customer?.alternate_phone || ""}
+            autoComplete="tel"
           />
         </label>
         <label>
