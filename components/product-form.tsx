@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { saveProductAction } from "@/app/actions/products";
 import { ProductImageInput } from "@/components/product-image-input";
+import { RequiredMark } from "@/components/required-mark";
 import { SubmitButton } from "@/components/submit-button";
 import type { Brand, Product } from "@/lib/types";
 
@@ -34,11 +35,17 @@ export function ProductForm({ product, brands }: ProductFormProps) {
 
       <div className="grid gap-4 md:grid-cols-2">
         <label>
-          <span className="field-label">Product ID</span>
+          <span className="field-label">
+            Product ID
+            <RequiredMark />
+          </span>
           <input className="field-input" name="sku" defaultValue={product?.sku} required />
         </label>
         <label>
-          <span className="field-label">Product Name</span>
+          <span className="field-label">
+            Product Name
+            <RequiredMark />
+          </span>
           <input
             className="field-input"
             name="product_name"
@@ -58,7 +65,10 @@ export function ProductForm({ product, brands }: ProductFormProps) {
           </select>
         </label>
         <label>
-          <span className="field-label">Unit Price</span>
+          <span className="field-label">
+            Unit Price
+            <RequiredMark />
+          </span>
           <input
             className="field-input"
             name="unit_price"

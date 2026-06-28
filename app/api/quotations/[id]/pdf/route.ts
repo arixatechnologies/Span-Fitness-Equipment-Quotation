@@ -1,15 +1,11 @@
 import { NextResponse } from "next/server";
 import { chromium } from "playwright";
 import { getQuotationWithItems, logActivity } from "@/lib/data";
-import { formatCustomerName, sanitizeFilename } from "@/lib/format";
+import { formatCustomerName, quotationDownloadBaseName } from "@/lib/format";
 import { getPdfChromeImages } from "@/lib/pdf-assets";
 import { renderQuotationHtml } from "@/lib/pdf-template";
 import { requireUser } from "@/lib/supabase/server";
 import type { CompanySettings, Customer } from "@/lib/types";
-
-function cleanQuoteNumber(value: string) {
-  return value.replace(/\[([^\]]+)\]\([^)]*\)/g, "$1");
-}
 
 async function createQuotationPdf(supabase: any, id: string) {
   const [{ quotation, items }, chromeImages] = await Promise.all([
@@ -41,9 +37,10 @@ async function createQuotationPdf(supabase: any, id: string) {
     await browser.close();
   }
 
-  const customerName = sanitizeFilename(formatCustomerName(customer));
-  const quoteNumber = sanitizeFilename(cleanQuoteNumber(quotation.quote_number));
-  const filename = `${customerName}-Quotation-${quoteNumber}.pdf`;
+  const filename = `${quotationDownloadBaseName(
+    formatCustomerName(customer),
+    quotation.quote_number
+  )}.pdf`;
 
   return { quotation, pdf, filename };
 }

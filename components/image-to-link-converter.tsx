@@ -26,6 +26,7 @@ import {
   type ChangeEvent,
   type DragEvent
 } from "react";
+import { RequiredMark } from "@/components/required-mark";
 
 const BOARD_SIZE = 1600;
 const MAX_SOURCE_SIZE = 25 * 1024 * 1024;
@@ -106,6 +107,7 @@ export function ImageToLinkConverter() {
   const [finalLink, setFinalLink] = useState("");
   const [history, setHistory] = useState<UploadHistoryItem[]>([]);
   const [dragActive, setDragActive] = useState(false);
+  const [pasting, setPasting] = useState(false);
   const [converting, setConverting] = useState(false);
   const [copied, setCopied] = useState(false);
   const [toast, setToast] = useState<ToastState | null>(null);
@@ -310,6 +312,44 @@ export function ImageToLinkConverter() {
     if (file) loadImageFile(file);
   }
 
+  async function pasteImage() {
+    if (!navigator.clipboard?.read) {
+      showToast("Paste button is unavailable in this browser. Use Ctrl + V.", true);
+      return;
+    }
+
+    setPasting(true);
+
+    try {
+      const clipboardItems = await navigator.clipboard.read();
+
+      for (const clipboardItem of clipboardItems) {
+        const imageType = clipboardItem.types.find((type) => type.startsWith("image/"));
+        if (!imageType) continue;
+
+        const blob = await clipboardItem.getType(imageType);
+        const extension = imageType.split("/")[1]?.replace("jpeg", "jpg") || "png";
+        const file = new File([blob], `pasted-image.${extension}`, { type: imageType });
+        loadImageFile(file, true);
+        return;
+      }
+
+      showToast("Clipboard does not contain an image.", true);
+    } catch (error) {
+      const permissionDenied =
+        error instanceof DOMException &&
+        (error.name === "NotAllowedError" || error.name === "SecurityError");
+      showToast(
+        permissionDenied
+          ? "Allow clipboard access, then try Paste Image again."
+          : "Unable to read an image from the clipboard.",
+        true
+      );
+    } finally {
+      setPasting(false);
+    }
+  }
+
   function invalidateOutput() {
     setFinalBlob(null);
     clearOutputLink();
@@ -441,9 +481,25 @@ export function ImageToLinkConverter() {
 
       <div className="grid min-w-0 gap-5 xl:grid-cols-[minmax(0,1.08fr)_minmax(360px,0.92fr)] xl:items-start">
         <section className="panel min-w-0 p-4 sm:p-5">
-          <div className="mb-4">
-            <div className="text-xs font-bold uppercase text-navy">Step 1</div>
-            <h2 className="mt-1 text-base font-black text-slate-950">Upload and Crop</h2>
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <div className="text-xs font-bold uppercase text-navy">Step 1</div>
+              <h2 className="mt-1 text-base font-black text-slate-950">Upload and Crop</h2>
+            </div>
+            <button
+              type="button"
+              className="btn-secondary w-full sm:w-auto"
+              onClick={() => void pasteImage()}
+              disabled={pasting}
+              aria-busy={pasting}
+            >
+              {pasting ? (
+                <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+              ) : (
+                <ClipboardPaste className="h-4 w-4" aria-hidden="true" />
+              )}
+              {pasting ? "Pasting..." : "Paste Image"}
+            </button>
           </div>
 
           <label
@@ -467,7 +523,10 @@ export function ImageToLinkConverter() {
             <span className="flex h-12 w-12 items-center justify-center rounded-md bg-mist text-ink">
               <ImagePlus className="h-6 w-6" aria-hidden="true" />
             </span>
-            <strong className="text-sm text-slate-950">Choose, drop, or paste an image</strong>
+            <strong className="text-sm text-slate-950">
+              Choose, drop, or paste an image
+              <RequiredMark />
+            </strong>
             <span className="flex items-center gap-1 text-xs text-slate-500">
               <ClipboardPaste className="h-3.5 w-3.5" aria-hidden="true" />
               Ctrl + V is supported

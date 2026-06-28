@@ -77,6 +77,7 @@ Or run the SQL files manually in Supabase SQL Editor:
 - `supabase/migrations/006_add_team_members.sql`
 - `supabase/migrations/007_add_member_profile_photos.sql`
 - `supabase/migrations/008_add_account_profile_fields.sql`
+- `supabase/migrations/009_shorten_quotation_numbers.sql`
 
 5. Set your admin login.
 
@@ -127,6 +128,7 @@ The migrations create:
 - `customers`
 - `team_members`
 - `quotations`
+- `quotation_number_counters`
 - `quotation_items`
 - `company_settings`
 - `brand_footer_logos`

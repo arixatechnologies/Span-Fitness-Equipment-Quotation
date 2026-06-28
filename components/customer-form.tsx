@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { saveCustomerAction } from "@/app/actions/customers";
+import { RequiredMark } from "@/components/required-mark";
 import { StateCitySelects } from "@/components/state-city-selects";
 import { SubmitButton } from "@/components/submit-button";
 import { customerSuffixOptions } from "@/lib/customer-options";
@@ -11,7 +12,10 @@ export function CustomerForm({ customer }: { customer?: Customer }) {
       <input type="hidden" name="id" value={customer?.id || ""} />
       <div className="grid gap-4 md:grid-cols-2">
         <label>
-          <span className="field-label">Phone</span>
+          <span className="field-label">
+            Phone
+            <RequiredMark />
+          </span>
           <input className="field-input" name="phone" defaultValue={customer?.phone || ""} required />
         </label>
         <label>
@@ -30,7 +34,10 @@ export function CustomerForm({ customer }: { customer?: Customer }) {
           </select>
         </label>
         <label>
-          <span className="field-label">Customer Name</span>
+          <span className="field-label">
+            Customer Name
+            <RequiredMark />
+          </span>
           <input
             className="field-input"
             name="customer_name"

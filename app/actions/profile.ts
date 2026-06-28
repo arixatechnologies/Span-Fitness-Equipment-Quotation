@@ -192,6 +192,7 @@ export async function saveMyProfileAction(formData: FormData) {
     id: user.id || undefined,
     name: parsed.name,
     role: user.role,
+    branchLocation: parsed.branchLocation || undefined,
     profilePhotoUrl: profilePhotoUrl || undefined
   });
   const cookieStore = await cookies();

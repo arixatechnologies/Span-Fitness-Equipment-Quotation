@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { RequiredMark } from "@/components/required-mark";
 import styles from "./login.module.css";
 
 type LoginFormProps = {
@@ -45,6 +46,7 @@ export function LoginForm({ redirectedFrom, error }: LoginFormProps) {
       <div className={styles.group}>
         <label className={styles.label} htmlFor="email">
           Email or Username
+          <RequiredMark />
         </label>
         <div className={styles.field}>
           <span className={styles.iconBadge} aria-hidden="true">
@@ -67,6 +69,7 @@ export function LoginForm({ redirectedFrom, error }: LoginFormProps) {
       <div className={styles.group}>
         <label className={styles.label} htmlFor="password">
           Password
+          <RequiredMark />
         </label>
         <div className={styles.field}>
           <span className={styles.iconBadge} aria-hidden="true">

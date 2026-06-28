@@ -1,5 +1,6 @@
 import { Save } from "lucide-react";
 import { saveCategoryAction, toggleCategoryAction } from "@/app/actions/taxonomy";
+import { RequiredMark } from "@/components/required-mark";
 import { SubmitButton } from "@/components/submit-button";
 import { StatusBadge } from "@/components/ui";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
@@ -20,7 +21,10 @@ export default async function CategoriesPage() {
 
       <form action={saveCategoryAction} className="panel grid gap-3 p-4 md:grid-cols-[1fr_240px_auto_auto]">
         <label>
-          <span className="field-label">New Category</span>
+          <span className="field-label">
+            New Category
+            <RequiredMark />
+          </span>
           <input className="field-input" name="name" placeholder="Category name" required />
         </label>
         <label>
@@ -62,7 +66,18 @@ export default async function CategoriesPage() {
 
                 <form action={saveCategoryAction} className="mt-3 grid gap-2">
                   <input type="hidden" name="id" value={category.id} />
-                  <input className="field-input" name="name" defaultValue={category.name} />
+                  <label>
+                    <span className="field-label">
+                      Category Name
+                      <RequiredMark />
+                    </span>
+                    <input
+                      className="field-input"
+                      name="name"
+                      defaultValue={category.name}
+                      required
+                    />
+                  </label>
                   <select className="field-input" name="parent_id" defaultValue={category.parent_id || ""}>
                     <option value="">Top-level</option>
                     {parentCategories
@@ -107,7 +122,10 @@ export default async function CategoriesPage() {
           <table className="w-full min-w-[900px]">
             <thead className="table-head">
               <tr>
-                <th className="px-4 py-3">Category</th>
+                <th className="px-4 py-3">
+                  Category
+                  <RequiredMark />
+                </th>
                 <th className="px-4 py-3">Parent</th>
                 <th className="px-4 py-3">Status</th>
                 <th className="px-4 py-3 text-right">Actions</th>
@@ -121,7 +139,13 @@ export default async function CategoriesPage() {
                     <td className="table-cell">
                       <form action={saveCategoryAction} className="flex items-center gap-2">
                         <input type="hidden" name="id" value={category.id} />
-                        <input className="field-input max-w-xs" name="name" defaultValue={category.name} />
+                        <input
+                          className="field-input max-w-xs"
+                          name="name"
+                          defaultValue={category.name}
+                          aria-label="Category name"
+                          required
+                        />
                         <select className="field-input max-w-56" name="parent_id" defaultValue={category.parent_id || ""}>
                           <option value="">Top-level</option>
                           {parentCategories

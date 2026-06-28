@@ -22,6 +22,27 @@ function customerFromSnapshot(snapshot: Quotation["customer_snapshot"]) {
   return snapshot as Partial<Customer>;
 }
 
+function customerFullAddress(customer: Partial<Customer>) {
+  const parts = [
+    ...String(customer.address || "").split(","),
+    customer.city,
+    customer.state,
+    customer.pincode
+  ]
+    .map((value) => String(value || "").trim())
+    .filter(Boolean);
+  const seen = new Set<string>();
+
+  return parts
+    .filter((part) => {
+      const normalized = part.toLowerCase().replace(/\s+/g, " ");
+      if (seen.has(normalized)) return false;
+      seen.add(normalized);
+      return true;
+    })
+    .join(", ");
+}
+
 function amount(value: number | string | null | undefined) {
   return new Intl.NumberFormat("en-IN", {
     maximumFractionDigits: 0
@@ -167,7 +188,11 @@ function splitProductPages(items: QuotationItem[]) {
     return { first, middle: [] as QuotationItem[][], final: [] as QuotationItem[] };
   }
 
-  const finalCount = Math.min(2, remaining.length);
+  const finalCount = remaining.length % 4;
+  if (finalCount === 0) {
+    return { first, middle: chunk(remaining, 4), final: [] as QuotationItem[] };
+  }
+
   const middleItems = remaining.slice(0, remaining.length - finalCount);
   const final = remaining.slice(remaining.length - finalCount);
 
@@ -207,6 +232,15 @@ function termsBlock(quotation: Quotation) {
       <p><strong>Transportation:</strong><br>${lines(quotation.transportation_note)}</p>
       <p><strong>GST:</strong><br>${gstText(quotation)}</p>
       <p><strong>Payment:</strong><br>${lines(quotation.payment_terms)}</p>
+    </div>
+  `;
+}
+
+function afterSalesBlock(quotation: Quotation) {
+  return `
+    <div class="support-block line-bottom">
+      <strong>After sales Support:</strong><br>
+      ${lines(quotation.after_sales_support)}
     </div>
   `;
 }
@@ -262,7 +296,7 @@ function firstPage({
           <div class="label">To:</div>
           <div class="customer-name">${escapeHtml(formatCustomerName(customer))},</div>
           <div>${escapeHtml(customer.phone || "")},</div>
-          <div>${escapeHtml(customer.address || ".")}</div>
+          <div>${escapeHtml(customerFullAddress(customer) || ".")}</div>
         </div>
         <div class="customer-right">
           <div><strong>DATE: ${formatDate(quotation.quote_date)}</strong></div>
@@ -309,8 +343,10 @@ function summaryPage({
   settings: CompanySettings;
   chromeImages: PdfChromeImages;
 }) {
+  const useCompactDetailsGrid = items.length === 3;
+
   return `
-    <section class="page page-2">
+    <section class="page page-2 summary-products-${items.length}">
       ${headerImage(chromeImages)}
       ${
         items.length
@@ -323,9 +359,17 @@ function summaryPage({
             })
           : ""
       }
-      ${totalsTable(quotation)}
-      ${termsBlock(quotation)}
-      ${bankBlock(settings)}
+      ${
+        useCompactDetailsGrid
+          ? `<div class="summary-details-grid">
+              ${totalsTable(quotation)}
+              ${termsBlock(quotation)}
+            </div>
+            ${bankBlock(settings)}`
+          : `${totalsTable(quotation)}
+            ${termsBlock(quotation)}
+            ${bankBlock(settings)}`
+      }
       ${footerImage(chromeImages, "page2-footer")}
     </section>
   `;
@@ -355,10 +399,7 @@ function supportPage({
     <section class="page page-3">
       ${headerImage(chromeImages)}
 
-      <div class="support-block line-top line-bottom">
-        <strong>After sales Support:</strong><br>
-        ${lines(quotation.after_sales_support)}
-      </div>
+      ${afterSalesBlock(quotation)}
 
       <div class="company-line line-bottom">
         <strong>For ${escapeHtml(settings.company_name)}</strong>
@@ -421,6 +462,22 @@ export function renderQuotationHtml({
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>${escapeHtml(quotation.quote_number)}</title>
   <style>
+@font-face {
+  font-family: "Quotation Numbers";
+  src: local("Arial"), local("Liberation Sans"), local("DejaVu Sans");
+  font-style: normal;
+  font-weight: 400 600;
+  unicode-range: U+0025, U+002C-0039, U+003A, U+20B9;
+}
+
+@font-face {
+  font-family: "Quotation Numbers";
+  src: local("Arial Bold"), local("Liberation Sans Bold"), local("DejaVu Sans Bold");
+  font-style: normal;
+  font-weight: 700 900;
+  unicode-range: U+0025, U+002C-0039, U+003A, U+20B9;
+}
+
 * { box-sizing: border-box; }
 
 html, body {
@@ -428,7 +485,8 @@ html, body {
   padding: 0;
   background: #e8e8e8;
   color: #000;
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: "Quotation Numbers", Georgia, "Times New Roman", Times, serif;
+  letter-spacing: 0;
 }
 
 .page {
@@ -450,6 +508,11 @@ html, body {
   width: 100%;
   height: auto;
   margin: 0 0 3.2mm 0;
+}
+
+.page-2 .top-banner {
+  height: 52mm;
+  object-fit: fill;
 }
 
 .quote-title {
@@ -495,8 +558,11 @@ html, body {
   vertical-align: middle;
 }
 
-.product-table .p-row td { height: 27.8mm; }
-.product-table .desc { padding-top: 1.9mm; }
+.product-table .p-row td { height: 32.5mm; }
+.product-table .desc {
+  padding-top: 1.9mm;
+  font-family: "Quotation Numbers", Verdana, "DejaVu Sans", sans-serif;
+}
 .center { text-align: center; }
 .top { vertical-align: top !important; }
 
@@ -509,11 +575,11 @@ html, body {
 .c-total { width: 13%; }
 
 .product-card {
-  width: 33mm;
-  height: 26mm;
+  width: 28.7mm;
+  height: 29.5mm;
   margin: -0.2mm auto 0 auto;
   border: 1.2px solid #111;
-  border-radius: 7px;
+  border-radius: 5px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -523,15 +589,15 @@ html, body {
 }
 
 .product-card img {
-  width: 26mm;
-  height: 20.5mm;
+  width: 22.5mm;
+  height: 23.5mm;
   object-fit: contain;
   display: block;
 }
 
 .product-fallback {
-  width: 26mm;
-  height: 20.5mm;
+  width: 22.5mm;
+  height: 23.5mm;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -540,9 +606,9 @@ html, body {
 }
 
 .product-card strong {
-  font-size: 7.2pt;
+  font-size: 6.8pt;
   line-height: 1;
-  padding: 0 0 2mm 0;
+  padding: 0 0 1.5mm 0;
 }
 
 .brand-footer {
@@ -566,7 +632,11 @@ html, body {
 .page2-products {
   margin-top: .3mm;
 }
-.page2-products .p-row td { height: 31mm; }
+.page2-products .p-row td {
+  height: 31.5mm;
+  padding-top: .8mm;
+  padding-bottom: .8mm;
+}
 
 .total-table {
   width: 69.6mm;
@@ -586,32 +656,59 @@ html, body {
 .total-table td:first-child { width: 63%; }
 .total-table td:last-child { width: 37%; }
 
+.summary-details-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 69.6mm;
+  align-items: start;
+}
+
+.summary-details-grid .total-table {
+  grid-column: 2;
+  grid-row: 1;
+}
+
+.summary-details-grid .terms-block {
+  grid-column: 1;
+  grid-row: 1;
+  width: auto;
+  margin-top: 0;
+  margin-right: 6mm;
+}
+
 .terms-block {
   margin-left: 9mm;
-  margin-top: 1.6mm;
-  width: 100mm;
-  font-size: 7.1pt;
+  margin-top: 2mm;
+  width: 150mm;
+  font-size: 8.25pt;
+  line-height: 1.2;
+}
+
+.terms-block p {
+  margin: 0 0 1mm 0;
+  break-inside: avoid;
+}
+
+.terms-block strong {
+  display: inline-block;
+  margin-bottom: .35mm;
+  font-size: 8.6pt;
   line-height: 1.1;
 }
 
-.terms-block p { margin: 0 0 1.7mm 0; }
-
 .bank-block {
-  position: absolute;
-  left: 20.7mm;
-  right: 11.7mm;
-  bottom: 47mm;
-  padding-top: 1.8mm;
+  margin: 1mm 9mm 0 9mm;
+  padding-top: .9mm;
+  padding-bottom: .9mm;
   border-top: 1.35px solid #000;
   border-bottom: 1.35px solid #000;
-  font-size: 7.1pt;
-  line-height: 1.18;
-  min-height: 20mm;
+  font-size: 7.2pt;
+  line-height: 1.15;
+  min-height: 17mm;
 }
 
 .support-block {
   margin-top: 1mm;
-  padding: 2mm 9mm 1.5mm 9mm;
+  padding: 1.5mm 9mm 1mm 9mm;
   font-size: 7.6pt;
   line-height: 1.15;
 }
@@ -689,7 +786,11 @@ html, body {
   ${firstPage({ quotation, items: first, customer, settings, chromeImages })}
   ${middlePages}
   ${summaryPage({ quotation, items: final, startIndex: nextIndex, settings, chromeImages })}
-  ${supportPage({ quotation, settings, chromeImages })}
+  ${supportPage({
+    quotation,
+    settings,
+    chromeImages
+  })}
 </body>
 </html>`;
 }

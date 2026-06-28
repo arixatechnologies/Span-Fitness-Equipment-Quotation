@@ -5,6 +5,7 @@ import {
   toggleMemberStatusAction
 } from "@/app/actions/members";
 import { MemberPhotoInput } from "@/components/member-photo-input";
+import { RequiredMark } from "@/components/required-mark";
 import { SubmitButton } from "@/components/submit-button";
 import { StatusBadge } from "@/components/ui";
 import { requireAdmin } from "@/lib/supabase/server";
@@ -51,7 +52,10 @@ export default async function MembersPage() {
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           <MemberPhotoInput />
           <label htmlFor="member-name">
-            <span className="field-label">Member Name</span>
+            <span className="field-label">
+              Member Name
+              <RequiredMark />
+            </span>
             <input
               id="member-name"
               className="field-input"
@@ -61,7 +65,10 @@ export default async function MembersPage() {
             />
           </label>
           <label htmlFor="member-phone">
-            <span className="field-label">Phone Number</span>
+            <span className="field-label">
+              Phone Number
+              <RequiredMark />
+            </span>
             <input
               id="member-phone"
               className="field-input"
@@ -73,7 +80,10 @@ export default async function MembersPage() {
             />
           </label>
           <label htmlFor="member-email">
-            <span className="field-label">Email</span>
+            <span className="field-label">
+              Email
+              <RequiredMark />
+            </span>
             <input
               id="member-email"
               className="field-input"
@@ -84,7 +94,10 @@ export default async function MembersPage() {
             />
           </label>
           <label htmlFor="member-password">
-            <span className="field-label">Password</span>
+            <span className="field-label">
+              Password
+              <RequiredMark />
+            </span>
             <input
               id="member-password"
               className="field-input"
@@ -98,6 +111,7 @@ export default async function MembersPage() {
           <div>
             <label className="field-label" htmlFor="member-role">
               Role
+              <RequiredMark />
             </label>
             <select
               id="member-role"
@@ -112,7 +126,10 @@ export default async function MembersPage() {
             </select>
           </div>
           <label htmlFor="member-branch">
-            <span className="field-label">Branch / Location</span>
+            <span className="field-label">
+              Branch / Location
+              <RequiredMark />
+            </span>
             <input
               id="member-branch"
               className="field-input"
@@ -123,6 +140,7 @@ export default async function MembersPage() {
           <div>
             <label className="field-label" htmlFor="member-status">
               Status
+              <RequiredMark />
             </label>
             <select
               id="member-status"

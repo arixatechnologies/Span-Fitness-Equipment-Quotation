@@ -1,6 +1,7 @@
 import Link from "next/link";
-import { Eye, Pencil, Plus, Search, Trash2 } from "lucide-react";
+import { Eye, Pencil, Plus, Trash2 } from "lucide-react";
 import { deleteQuotationAction } from "@/app/actions/quotations";
+import { SearchField } from "@/components/search-field";
 import { EmptyState, StatusBadge } from "@/components/ui";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { formatCurrency, formatCustomerName, formatDate } from "@/lib/format";
@@ -28,7 +29,6 @@ export default async function QuotationsPage({
         `quote_number.ilike.%${q}%`,
         `customer_snapshot->>phone.ilike.%${q}%`,
         `customer_snapshot->>customer_name.ilike.%${q}%`,
-        `customer_snapshot->>business_name.ilike.%${q}%`,
         `customer_snapshot->>email.ilike.%${q}%`,
         `customer_snapshot->>gst_number.ilike.%${q}%`
       ].join(",")
@@ -53,16 +53,13 @@ export default async function QuotationsPage({
       </div>
 
       <form className="panel grid gap-3 p-4 md:grid-cols-[1fr_180px_auto]">
-        <label className="relative">
-          <span className="field-label">Search Quotations</span>
-          <Search className="pointer-events-none absolute left-3 top-8 h-4 w-4 text-slate-400" />
-          <input
-            className="field-input !pl-10"
-            name="q"
-            defaultValue={q}
-            placeholder="Search..."
-          />
-        </label>
+        <SearchField
+          name="q"
+          defaultValue={q}
+          label="Search Quotations"
+          placeholder="Search..."
+          showSearchIcon
+        />
         <label>
           <span className="field-label">Status</span>
           <select className="field-input" name="status" defaultValue={status}>
@@ -96,12 +93,26 @@ export default async function QuotationsPage({
                       >
                         {quotation.quote_number}
                       </Link>
-                      <div className="text-xs text-slate-500">Revision R{quotation.revision}</div>
+                      {quotation.revision > 0 ? (
+                        <div className="text-xs text-slate-500">
+                          Revision R{quotation.revision}
+                        </div>
+                      ) : null}
                     </div>
                     <StatusBadge status={quotation.status} />
                   </div>
                   <div className="mt-3 grid gap-1 text-sm text-slate-700">
-                    <div>{formatCustomerName(customer)}</div>
+                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                      <span>{formatCustomerName(customer)}</span>
+                      {customer.phone ? (
+                        <a
+                          href={`tel:${customer.phone}`}
+                          className="font-semibold text-navy hover:underline"
+                        >
+                          {customer.phone}
+                        </a>
+                      ) : null}
+                    </div>
                     <div>{formatDate(quotation.quote_date)}</div>
                     <div className="font-black text-navy">{formatCurrency(quotation.grand_total)}</div>
                   </div>
@@ -140,15 +151,16 @@ export default async function QuotationsPage({
           </div>
 
           <div className="hidden overflow-x-auto md:block">
-            <table className="w-full min-w-[1040px]">
+            <table className="w-full min-w-[1120px]">
               <thead className="table-head">
                 <tr>
                   <th className="px-4 py-3">Quotation</th>
                   <th className="px-4 py-3">Customer</th>
+                  <th className="px-4 py-3">Phone</th>
                   <th className="px-4 py-3">Date</th>
                   <th className="px-4 py-3 text-right">Grand Total</th>
                   <th className="px-4 py-3">Status</th>
-                  <th className="px-4 py-3 text-right">Actions</th>
+                  <th className="px-4 py-3 text-center">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -160,10 +172,26 @@ export default async function QuotationsPage({
                         <Link href={`/quotations/${quotation.id}`} className="font-black text-navy">
                           {quotation.quote_number}
                         </Link>
-                        <div className="text-xs text-slate-500">Revision R{quotation.revision}</div>
+                        {quotation.revision > 0 ? (
+                          <div className="text-xs text-slate-500">
+                            Revision R{quotation.revision}
+                          </div>
+                        ) : null}
                       </td>
                       <td className="table-cell">
                         {formatCustomerName(customer)}
+                      </td>
+                      <td className="table-cell">
+                        {customer.phone ? (
+                          <a
+                            href={`tel:${customer.phone}`}
+                            className="font-semibold text-navy hover:underline"
+                          >
+                            {customer.phone}
+                          </a>
+                        ) : (
+                          <span className="text-slate-400">Not provided</span>
+                        )}
                       </td>
                       <td className="table-cell">{formatDate(quotation.quote_date)}</td>
                       <td className="table-cell text-right font-black text-navy">
@@ -173,7 +201,7 @@ export default async function QuotationsPage({
                         <StatusBadge status={quotation.status} />
                       </td>
                       <td className="table-cell">
-                        <div className="flex justify-end gap-2">
+                        <div className="flex justify-center gap-2">
                           <Link
                             href={`/quotations/${quotation.id}/preview`}
                             className="btn-secondary px-3"

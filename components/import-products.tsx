@@ -4,6 +4,7 @@ import { useMemo, useState, useTransition } from "react";
 import { Loader2, Upload } from "lucide-react";
 import readXlsxFile from "read-excel-file";
 import { bulkImportProducts } from "@/app/actions/products";
+import { RequiredMark } from "@/components/required-mark";
 
 const fieldLabels = {
   sku: "SKU",
@@ -174,12 +175,16 @@ export function ImportProducts() {
     <div className="grid gap-5">
       <div className="panel p-5">
         <label>
-          <span className="field-label">Upload CSV or Excel file</span>
+          <span className="field-label">
+            Upload CSV or Excel file
+            <RequiredMark />
+          </span>
           <input
             className="field-input file:mr-3 file:rounded-md file:border-0 file:bg-rose file:px-3 file:py-1.5 file:text-sm file:font-semibold file:text-ink"
             type="file"
             accept=".xlsx,.xls,.csv"
             onChange={onFile}
+            required
           />
         </label>
         {message && !rows.length ? (
@@ -202,10 +207,14 @@ export function ImportProducts() {
             <div className="grid gap-4 md:grid-cols-3">
               {Object.entries(fieldLabels).map(([field, label]) => (
                 <label key={field}>
-                  <span className="field-label">{label}</span>
+                  <span className="field-label">
+                    {label}
+                    {requiredFields.includes(field) ? <RequiredMark /> : null}
+                  </span>
                   <select
                     className="field-input"
                     value={mapping[field] || ""}
+                    required={requiredFields.includes(field)}
                     onChange={(event) =>
                       setMapping((current) => ({ ...current, [field]: event.target.value }))
                     }

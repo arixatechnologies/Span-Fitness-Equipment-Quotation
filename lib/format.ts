@@ -39,8 +39,16 @@ export function sanitizeFilename(value: string) {
     .replace(/^-|-$/g, "");
 }
 
+export function quotationDownloadBaseName(customerName: string, quoteNumber: string) {
+  const safeCustomerName = sanitizeFilename(customerName) || "Customer";
+  const cleanQuoteNumber = quoteNumber.replace(/\[([^\]]+)\]\([^)]*\)/g, "$1");
+  const safeQuoteNumber = sanitizeFilename(cleanQuoteNumber) || "Quotation";
+
+  return `${safeCustomerName}-${safeQuoteNumber}`;
+}
+
 export function quoteDisplayNumber(baseQuoteNumber: string, revision: number) {
-  return `${baseQuoteNumber}-R${revision}`;
+  return revision > 0 ? `${baseQuoteNumber}-R${revision}` : baseQuoteNumber;
 }
 
 export function formatCustomerName(

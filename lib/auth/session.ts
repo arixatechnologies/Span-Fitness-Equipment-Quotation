@@ -8,6 +8,7 @@ export type AdminSession = {
   memberId?: string;
   name: string;
   role: TeamMemberRole;
+  branchLocation?: string;
   profilePhotoUrl?: string;
   iat: number;
   exp: number;
@@ -100,6 +101,7 @@ export async function createSessionToken(
     id?: string;
     name?: string;
     role?: TeamMemberRole;
+    branchLocation?: string;
     profilePhotoUrl?: string;
   }
 ) {
@@ -115,6 +117,7 @@ export async function createSessionToken(
     memberId: member?.id,
     name: member?.name || email,
     role: member?.role || "Admin",
+    branchLocation: member?.branchLocation,
     profilePhotoUrl: member?.profilePhotoUrl,
     iat: now,
     exp: now + SESSION_MAX_AGE_SECONDS

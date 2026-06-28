@@ -1,5 +1,6 @@
 import { Save, Trash2 } from "lucide-react";
 import { deleteBrandAction, saveBrandAction, toggleBrandAction } from "@/app/actions/taxonomy";
+import { RequiredMark } from "@/components/required-mark";
 import { SubmitButton } from "@/components/submit-button";
 import { StatusBadge } from "@/components/ui";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
@@ -18,7 +19,10 @@ export default async function BrandsPage() {
 
       <form action={saveBrandAction} className="panel grid gap-3 p-4 md:grid-cols-[1fr_auto_auto]">
         <label>
-          <span className="field-label">New Brand</span>
+          <span className="field-label">
+            New Brand
+            <RequiredMark />
+          </span>
           <input className="field-input" name="name" placeholder="Brand name" required />
         </label>
         <label
@@ -55,7 +59,13 @@ export default async function BrandsPage() {
 
               <form action={saveBrandAction} className="mt-3 grid gap-2">
                 <input type="hidden" name="id" value={brand.id} />
-                <input className="field-input" name="name" defaultValue={brand.name} />
+                <label>
+                  <span className="field-label">
+                    Brand Name
+                    <RequiredMark />
+                  </span>
+                  <input className="field-input" name="name" defaultValue={brand.name} required />
+                </label>
                 <label
                   className="flex items-center gap-2 text-sm"
                   title="Active brands appear in product brand dropdowns."
@@ -113,7 +123,10 @@ export default async function BrandsPage() {
           <table className="w-full min-w-[900px]">
             <thead className="table-head">
               <tr>
-                <th className="px-4 py-3">Brand</th>
+                <th className="px-4 py-3">
+                  Brand
+                  <RequiredMark />
+                </th>
                 <th className="px-4 py-3">Slug</th>
                 <th className="px-4 py-3">Status</th>
                 <th className="px-4 py-3 text-right">Actions</th>
@@ -125,7 +138,13 @@ export default async function BrandsPage() {
                   <td className="table-cell">
                     <form action={saveBrandAction} className="flex items-center gap-2">
                       <input type="hidden" name="id" value={brand.id} />
-                      <input className="field-input max-w-xs" name="name" defaultValue={brand.name} />
+                      <input
+                        className="field-input max-w-xs"
+                        name="name"
+                        defaultValue={brand.name}
+                        aria-label="Brand name"
+                        required
+                      />
                       <label
                         className="flex items-center gap-2 text-sm"
                         title="Active brands appear in product brand dropdowns."

@@ -1,6 +1,7 @@
 import Link from "next/link";
-import { Edit, Plus, Search, Trash2 } from "lucide-react";
+import { Edit, Plus, Trash2 } from "lucide-react";
 import { deleteCustomerAction } from "@/app/actions/customers";
+import { SearchField } from "@/components/search-field";
 import { EmptyState } from "@/components/ui";
 import { formatCustomerName } from "@/lib/format";
 import { getSearchText } from "@/lib/search";
@@ -20,7 +21,7 @@ export default async function CustomersPage({
 
   if (q) {
     query = query.or(
-      `customer_name.ilike.%${q}%,suffix.ilike.%${q}%,phone.ilike.%${q}%,email.ilike.%${q}%`
+      `customer_name.ilike.%${q}%,suffix.ilike.%${q}%,phone.ilike.%${q}%,email.ilike.%${q}%,gst_number.ilike.%${q}%`
     );
   }
 
@@ -41,16 +42,13 @@ export default async function CustomersPage({
       </div>
 
       <form className="panel grid gap-3 p-4 md:grid-cols-[1fr_auto]">
-        <label className="relative">
-          <span className="field-label">Search</span>
-          <Search className="pointer-events-none absolute left-3 top-8 h-4 w-4 text-slate-400" />
-          <input
-            className="field-input pl-9"
-            name="q"
-            defaultValue={q}
-            placeholder="Name, suffix, phone, email"
-          />
-        </label>
+        <SearchField
+          name="q"
+          defaultValue={q}
+          label="Search"
+          placeholder="Search..."
+          showSearchIcon
+        />
         <div className="flex items-end">
           <button type="submit" className="btn-secondary w-full sm:w-auto">
             Search
@@ -64,11 +62,18 @@ export default async function CustomersPage({
             {(customers || []).map((customer: any) => (
               <div key={customer.id} className="rounded-md border border-line bg-white p-3">
                 <div className="font-black text-slate-950">{formatCustomerName(customer)}</div>
-                <div className="mt-1 text-xs text-slate-500">{customer.gst_number || "No GST number"}</div>
                 <div className="mt-3 grid gap-1 text-sm text-slate-700">
                   <div>{customer.phone}</div>
                   <div>{customer.email || "-"}</div>
-                  <div>{[customer.city, customer.state, customer.pincode].filter(Boolean).join(", ") || "-"}</div>
+                  <div>
+                    <span className="font-semibold text-slate-500">GST Number: </span>
+                    {customer.gst_number || "-"}
+                  </div>
+                  <div>
+                    {[customer.address, customer.city, customer.state, customer.pincode]
+                      .filter(Boolean)
+                      .join(", ") || "-"}
+                  </div>
                 </div>
                 <div className="mt-3 grid grid-cols-2 gap-2">
                   <Link href={`/customers/${customer.id}/edit`} className="btn-secondary w-full px-3">
@@ -88,12 +93,13 @@ export default async function CustomersPage({
           </div>
 
           <div className="hidden overflow-x-auto md:block">
-            <table className="w-full min-w-[820px]">
+            <table className="w-full min-w-[980px]">
               <thead className="table-head">
                 <tr>
-                  <th className="px-4 py-3">Customer</th>
+                  <th className="px-4 py-3">Customer Name</th>
                   <th className="px-4 py-3">Phone</th>
                   <th className="px-4 py-3">Email</th>
+                  <th className="px-4 py-3">GST Number</th>
                   <th className="px-4 py-3">Location</th>
                   <th className="px-4 py-3 text-right">Actions</th>
                 </tr>
@@ -103,12 +109,14 @@ export default async function CustomersPage({
                   <tr key={customer.id}>
                     <td className="table-cell">
                       <div className="font-black text-slate-950">{formatCustomerName(customer)}</div>
-                      <div className="text-xs text-slate-500">{customer.gst_number || "No GST number"}</div>
                     </td>
                     <td className="table-cell">{customer.phone}</td>
                     <td className="table-cell">{customer.email || "-"}</td>
-                    <td className="table-cell">
-                      {[customer.city, customer.state, customer.pincode].filter(Boolean).join(", ") || "-"}
+                    <td className="table-cell">{customer.gst_number || "-"}</td>
+                    <td className="table-cell max-w-xs whitespace-normal">
+                      {[customer.address, customer.city, customer.state, customer.pincode]
+                        .filter(Boolean)
+                        .join(", ") || "-"}
                     </td>
                     <td className="table-cell">
                       <div className="flex justify-end gap-2">

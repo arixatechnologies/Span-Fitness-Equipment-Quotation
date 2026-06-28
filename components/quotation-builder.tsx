@@ -4,6 +4,7 @@ import Image from "next/image";
 import { useMemo, useState } from "react";
 import { ChevronDown, Plus, Trash2 } from "lucide-react";
 import { saveQuotationAction } from "@/app/actions/quotations";
+import { RequiredMark } from "@/components/required-mark";
 import { StateCitySelects } from "@/components/state-city-selects";
 import { SubmitButton } from "@/components/submit-button";
 import { calculateQuotation } from "@/lib/calculations";
@@ -167,7 +168,7 @@ function ProductDropdown({
       </button>
 
       {isOpen ? (
-        <div className="absolute left-0 top-11 w-[min(78vw,360px)] min-w-0 rounded-md border border-slate-300 bg-white shadow-xl sm:w-full sm:min-w-[300px]">
+        <div className="absolute left-0 top-11 w-[min(70vw,360px)] min-w-0 rounded-md border border-slate-300 bg-white shadow-xl sm:w-full sm:min-w-[300px]">
           <div className="border-b border-line p-1.5">
             <input
               autoFocus
@@ -251,7 +252,7 @@ export function QuotationBuilder({
 }: QuotationBuilderProps) {
   const snapshot = quotation?.customer_snapshot as Partial<Customer> | undefined;
   const [customerMode, setCustomerMode] = useState<"existing" | "new">(
-    quotation && !quotation.customer_id ? "new" : "existing"
+    quotation?.customer_id ? "existing" : "new"
   );
   const [customerId, setCustomerId] = useState(quotation?.customer_id || customers[0]?.id || "");
   const [items, setItems] = useState<QuotationItemInput[]>(
@@ -445,7 +446,10 @@ export function QuotationBuilder({
 
         {customerMode === "existing" ? (
           <label>
-            <span className="field-label">Select Customer</span>
+            <span className="field-label">
+              Select Customer
+              <RequiredMark />
+            </span>
             <select
               className="field-input"
               value={customerId}
@@ -468,7 +472,10 @@ export function QuotationBuilder({
         ) : (
           <div className="grid gap-4 md:grid-cols-2">
             <label>
-              <span className="field-label">Phone</span>
+              <span className="field-label">
+                Phone
+                <RequiredMark />
+              </span>
               <input
                 className="field-input"
                 name="new_phone"
@@ -488,7 +495,10 @@ export function QuotationBuilder({
               </select>
             </label>
             <label>
-              <span className="field-label">Customer Name</span>
+              <span className="field-label">
+                Customer Name
+                <RequiredMark />
+              </span>
               <input
                 className="field-input"
                 name="new_customer_name"
@@ -548,32 +558,51 @@ export function QuotationBuilder({
       </section>
 
       <section className="min-w-0 rounded-sm border border-line bg-white">
-        <div className="hidden min-w-0 lg:block">
-        <div className="max-w-full overflow-x-auto pb-64">
-          <table className="w-full min-w-[1420px] border-collapse">
+        <div className="hidden min-w-0 xl:block">
+        <div className={openProductRow !== null ? "pb-64" : ""}>
+          <table className="w-full table-fixed border-collapse">
+            <colgroup>
+              <col className="w-[4%]" />
+              <col className="w-[22%]" />
+              <col className="w-[7%]" />
+              <col className="w-[9%]" />
+              <col className="w-[10%]" />
+              <col className="w-[11%]" />
+              <col className="w-[6%]" />
+              <col className="w-[8%]" />
+              <col className="w-[12%]" />
+              <col className="w-[11%]" />
+            </colgroup>
             <thead>
               <tr className="bg-mist text-xs font-black text-ink">
-                <th className="px-4 py-3 text-center">#</th>
-                <th className="px-4 py-3 text-center">Model No</th>
-                <th className="px-4 py-3 text-center">Image</th>
-                <th className="px-4 py-3 text-center">Unit Price</th>
-                <th className="px-4 py-3 text-center">Discount (%)</th>
-                <th className="px-4 py-3 text-center">Special Price</th>
-                <th className="px-4 py-3 text-center">GST</th>
-                <th className="px-4 py-3 text-center">Quantity</th>
-                <th className="px-4 py-3 text-center">Total Amount</th>
-                <th className="sticky right-0 z-20 w-32 bg-mist px-4 py-3 text-center shadow-[-8px_0_16px_rgba(36,50,58,0.08)]">
-                  Action
+                <th className="px-1 py-3 text-center">#</th>
+                <th className="px-2 py-3 text-center">
+                  Model No
+                  <RequiredMark />
                 </th>
+                <th className="px-1 py-3 text-center">Image</th>
+                <th className="px-2 py-3 text-center">Unit Price</th>
+                <th className="px-2 py-3 text-center">Discount (%)</th>
+                <th className="px-2 py-3 text-center">
+                  Special Price
+                  <RequiredMark />
+                </th>
+                <th className="px-1 py-3 text-center">GST</th>
+                <th className="px-2 py-3 text-center">
+                  Quantity
+                  <RequiredMark />
+                </th>
+                <th className="px-2 py-3 text-center">Total Amount</th>
+                <th className="px-2 py-3 text-center">Action</th>
               </tr>
             </thead>
             <tbody>
               {items.map((item, index) => (
                 <tr key={`${item.product_id || "empty"}-${index}`} className="border-b border-line bg-panel">
-                  <td className="w-14 px-4 py-3 text-center text-xs font-black text-black">
+                  <td className="px-1 py-3 text-center text-xs font-black text-black">
                     {index + 1}
                   </td>
-                  <td className="w-[300px] px-4 py-3">
+                  <td className="px-2 py-3">
                     <ProductDropdown
                       item={item}
                       products={products}
@@ -587,7 +616,7 @@ export function QuotationBuilder({
                       onClear={() => clearProduct(index)}
                     />
                   </td>
-                  <td className="w-20 px-4 py-3 text-center">
+                  <td className="px-1 py-3 text-center">
                     {item.image_url ? (
                       <Image
                         src={item.image_url}
@@ -602,9 +631,9 @@ export function QuotationBuilder({
                       </div>
                     )}
                   </td>
-                  <td className="w-32 px-4 py-3">
+                  <td className="px-2 py-3">
                     <input
-                      className="h-10 w-full rounded-md border border-slate-300 bg-slate-200 px-3 text-xs text-slate-900"
+                      className="h-10 w-full min-w-0 rounded-md border border-slate-300 bg-slate-200 px-2 text-xs text-slate-900"
                       type="number"
                       min="0"
                       value={item.product_name ? item.unit_price : ""}
@@ -612,9 +641,9 @@ export function QuotationBuilder({
                       readOnly
                     />
                   </td>
-                  <td className="w-36 px-4 py-3">
+                  <td className="px-2 py-3">
                     <input
-                      className="h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-xs text-slate-900 outline-none focus:border-gold focus:ring-2 focus:ring-gold/25"
+                      className="h-10 w-full min-w-0 rounded-md border border-slate-300 bg-white px-2 text-xs text-slate-900 outline-none focus:border-gold focus:ring-2 focus:ring-gold/25"
                       type="number"
                       min="0"
                       max="100"
@@ -623,51 +652,56 @@ export function QuotationBuilder({
                       onChange={(event) => updateDiscount(index, event.target.value)}
                     />
                   </td>
-                  <td className="w-60 px-4 py-3">
+                  <td className="px-2 py-3">
                     <input
-                      className="h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-xs text-slate-900 outline-none focus:border-gold focus:ring-2 focus:ring-gold/25"
+                      className="h-10 w-full min-w-0 rounded-md border border-slate-300 bg-white px-2 text-xs text-slate-900 outline-none focus:border-gold focus:ring-2 focus:ring-gold/25"
                       type="number"
                       min="0"
                       step="0.01"
                       value={item.product_name ? item.special_price : ""}
+                      required={Boolean(item.product_name)}
                       onChange={(event) =>
                         updateItem(index, { special_price: Math.max(0, Number(event.target.value || 0)) })
                       }
                     />
                   </td>
-                  <td className="w-24 px-4 py-3 text-center text-xs font-black text-black">
+                  <td className="px-1 py-3 text-center text-xs font-black text-black">
                     {item.product_name ? `${formatAmount(item.gst_percent)}%` : ""}
                   </td>
-                  <td className="w-32 px-4 py-3">
+                  <td className="px-2 py-3">
                     <input
-                      className="h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-xs text-slate-900 outline-none focus:border-gold focus:ring-2 focus:ring-gold/25"
+                      className="h-10 w-full min-w-0 rounded-md border border-slate-300 bg-white px-2 text-xs text-slate-900 outline-none focus:border-gold focus:ring-2 focus:ring-gold/25"
                       type="number"
                       min="1"
                       step="1"
                       value={item.qty}
+                      required={Boolean(item.product_name)}
                       onChange={(event) =>
                         updateItem(index, { qty: Math.max(1, Number(event.target.value || 1)) })
                       }
                     />
                   </td>
-                  <td className="w-60 px-4 py-3">
+                  <td className="px-2 py-3">
                     <input
-                      className="h-10 w-full rounded-md border border-slate-300 bg-slate-200 px-3 text-xs text-slate-900"
+                      className="h-10 w-full min-w-0 rounded-md border border-slate-300 bg-slate-200 px-2 text-xs text-slate-900"
                       value={item.product_name ? formatAmount(getLineTotal(item)) : ""}
                       disabled
                       readOnly
                     />
                   </td>
-                  <td className="sticky right-0 w-32 bg-panel px-4 py-3 text-center shadow-[-8px_0_16px_rgba(36,50,58,0.08)]">
+                  <td className="px-2 py-3 text-center">
                     <button
                       type="button"
                       onClick={() => removeItem(index)}
-                      className="btn-danger h-9 px-3"
+                      className="btn-danger h-[46px] w-[46px] !p-0"
                       aria-label="Delete product row"
                       title="Delete product row"
                     >
-                      <Trash2 className="h-4 w-4" />
-                      Delete
+                      <Trash2
+                        className="h-[27px] w-[27px] shrink-0"
+                        strokeWidth={2.5}
+                        aria-hidden="true"
+                      />
                     </button>
                   </td>
                 </tr>
@@ -698,7 +732,7 @@ export function QuotationBuilder({
         </div>
         </div>
 
-        <div className="grid min-w-0 gap-4 p-4 lg:hidden">
+        <div className="grid min-w-0 gap-4 p-4 xl:hidden">
           {items.map((item, index) => (
             <div
               key={`${item.product_id || "empty-mobile"}-${index}`}
@@ -709,7 +743,10 @@ export function QuotationBuilder({
                   {index + 1}
                 </div>
                 <div className="min-w-0 flex-1">
-                  <span className="field-label">Model No</span>
+                  <span className="field-label">
+                    Model No
+                    <RequiredMark />
+                  </span>
                   <ProductDropdown
                     item={item}
                     products={products}
@@ -781,26 +818,34 @@ export function QuotationBuilder({
                   />
                 </label>
                 <label>
-                  <span className="field-label">Special Price</span>
+                  <span className="field-label">
+                    Special Price
+                    <RequiredMark />
+                  </span>
                   <input
                     className="h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-xs text-slate-900 outline-none focus:border-gold focus:ring-2 focus:ring-gold/25"
                     type="number"
                     min="0"
                     step="0.01"
                     value={item.product_name ? item.special_price : ""}
+                    required={Boolean(item.product_name)}
                     onChange={(event) =>
                       updateItem(index, { special_price: Math.max(0, Number(event.target.value || 0)) })
                     }
                   />
                 </label>
                 <label>
-                  <span className="field-label">Quantity</span>
+                  <span className="field-label">
+                    Quantity
+                    <RequiredMark />
+                  </span>
                   <input
                     className="h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-xs text-slate-900 outline-none focus:border-gold focus:ring-2 focus:ring-gold/25"
                     type="number"
                     min="1"
                     step="1"
                     value={item.qty}
+                    required={Boolean(item.product_name)}
                     onChange={(event) =>
                       updateItem(index, { qty: Math.max(1, Number(event.target.value || 1)) })
                     }
@@ -849,15 +894,15 @@ export function QuotationBuilder({
       <section className="grid min-w-0 gap-6 xl:grid-cols-[minmax(0,650px)_1fr]">
         <div className="min-w-0">
           <h2 className="mb-4 text-xl font-black text-slate-950">Summary of GST</h2>
-          <div className="max-w-full overflow-x-auto">
-            <table className="w-full min-w-[620px] border-collapse bg-white text-xs">
+          <div className="max-w-full">
+            <table className="w-full table-fixed border-collapse bg-white text-[10px] sm:text-xs">
               <thead>
                 <tr className="bg-mist text-ink">
-                  <th className="px-4 py-3 text-center">GST Rate</th>
-                  <th className="px-4 py-3 text-center">Taxable Value</th>
-                  <th className="px-4 py-3 text-center">CGST</th>
-                  <th className="px-4 py-3 text-center">SGST</th>
-                  <th className="px-4 py-3 text-center">IGST</th>
+                  <th className="px-1 py-3 text-center sm:px-4">GST Rate</th>
+                  <th className="px-1 py-3 text-center sm:px-4">Taxable Value</th>
+                  <th className="px-1 py-3 text-center sm:px-4">CGST</th>
+                  <th className="px-1 py-3 text-center sm:px-4">SGST</th>
+                  <th className="px-1 py-3 text-center sm:px-4">IGST</th>
                 </tr>
               </thead>
               <tbody>
@@ -874,11 +919,11 @@ export function QuotationBuilder({
                     ]
                 ).map((row) => (
                   <tr key={row.rate} className="bg-panel text-center font-black text-ink">
-                    <td className="px-4 py-3">{formatAmount(row.rate)}%</td>
-                    <td className="px-4 py-3">{formatTaxAmount(row.taxable)}</td>
-                    <td className="px-4 py-3">{formatTaxAmount(row.cgst)}</td>
-                    <td className="px-4 py-3">{formatTaxAmount(row.sgst)}</td>
-                    <td className="px-4 py-3">{formatTaxAmount(row.igst)}</td>
+                    <td className="px-1 py-3 sm:px-4">{formatAmount(row.rate)}%</td>
+                    <td className="px-1 py-3 sm:px-4">{formatTaxAmount(row.taxable)}</td>
+                    <td className="px-1 py-3 sm:px-4">{formatTaxAmount(row.cgst)}</td>
+                    <td className="px-1 py-3 sm:px-4">{formatTaxAmount(row.sgst)}</td>
+                    <td className="px-1 py-3 sm:px-4">{formatTaxAmount(row.igst)}</td>
                   </tr>
                 ))}
               </tbody>

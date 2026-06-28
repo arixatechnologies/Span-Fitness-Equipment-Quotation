@@ -1,6 +1,7 @@
 import { Save } from "lucide-react";
 import { saveMyProfileAction } from "@/app/actions/profile";
 import { MemberPhotoInput } from "@/components/member-photo-input";
+import { RequiredMark } from "@/components/required-mark";
 import { SubmitButton } from "@/components/submit-button";
 import type { TeamMemberRole } from "@/lib/types";
 
@@ -40,7 +41,10 @@ export function MyProfileForm({
         ) : null}
 
         <label htmlFor="profile-name">
-          <span className="field-label">Name</span>
+          <span className="field-label">
+            Name
+            <RequiredMark />
+          </span>
           <input
             id="profile-name"
             className="field-input"
@@ -61,7 +65,10 @@ export function MyProfileForm({
           />
         </label>
         <label htmlFor="profile-email">
-          <span className="field-label">Email</span>
+          <span className="field-label">
+            Email
+            <RequiredMark />
+          </span>
           <input
             id="profile-email"
             className={`field-input ${isMember ? "" : "bg-panel text-slate-500"}`}

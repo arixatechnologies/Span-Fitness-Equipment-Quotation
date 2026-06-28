@@ -40,6 +40,7 @@ export async function POST(request: Request) {
         id?: string;
         name: string;
         role: TeamMemberRole;
+        branchLocation?: string;
         profilePhotoUrl?: string;
       }
     | undefined;
@@ -50,6 +51,7 @@ export async function POST(request: Request) {
     let profile:
       | {
           full_name: string | null;
+          branch_location: string | null;
           profile_photo_url: string | null;
         }
       | null = null;
@@ -58,7 +60,7 @@ export async function POST(request: Request) {
       const supabase = createSupabaseAdminClient();
       const { data } = await supabase
         .from("profiles")
-        .select("full_name, profile_photo_url")
+        .select("full_name, branch_location, profile_photo_url")
         .eq("email", adminEmail)
         .maybeSingle();
       profile = data;
@@ -67,13 +69,14 @@ export async function POST(request: Request) {
     sessionMember = {
       name: profile?.full_name || "Administrator",
       role: "Admin",
+      branchLocation: profile?.branch_location || undefined,
       profilePhotoUrl: profile?.profile_photo_url || undefined
     };
   } else {
     const supabase = createSupabaseAdminClient();
     const { data: member, error } = await supabase
       .from("team_members")
-      .select("id, member_name, password_hash, role, profile_photo_url")
+      .select("id, member_name, password_hash, role, branch_location, profile_photo_url")
       .eq("email", email)
       .eq("status", "active")
       .maybeSingle();
@@ -84,6 +87,7 @@ export async function POST(request: Request) {
         id: member.id,
         name: member.member_name,
         role: member.role as TeamMemberRole,
+        branchLocation: member.branch_location || undefined,
         profilePhotoUrl: member.profile_photo_url || undefined
       };
     }

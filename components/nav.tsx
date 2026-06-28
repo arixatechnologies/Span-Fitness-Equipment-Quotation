@@ -11,6 +11,7 @@ import {
   Home,
   ImageUp,
   LogOut,
+  MapPin,
   Settings,
   Tags,
   UserPlus,
@@ -77,6 +78,15 @@ export function Sidebar({ role = "Admin" }: { role?: TeamMemberRole }) {
         </Link>
       </div>
 
+      <form action="/api/auth/logout" method="post" className="mt-3 hidden md:block">
+        <button
+          type="submit"
+          className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-rose"
+        >
+          <LogOut className="h-4 w-4" aria-hidden="true" />
+          Sign Out
+        </button>
+      </form>
     </aside>
   );
 }
@@ -90,7 +100,7 @@ export function Topbar({
   subtitle?: string;
   user: {
     name: string;
-    role: TeamMemberRole;
+    branchLocation?: string;
     profilePhotoUrl?: string;
   };
 }) {
@@ -113,11 +123,25 @@ export function Topbar({
           Back
         </button>
         <div className="min-w-0">
-          <h1 className="text-xl font-black text-slate-950">{title}</h1>
+          <h1 className="welcome-title text-xl font-black sm:text-2xl">{title}</h1>
           {subtitle ? <p className="text-sm text-slate-500">{subtitle}</p> : null}
         </div>
       </div>
-      <div className="flex w-full items-center justify-between gap-3 rounded-md border border-line bg-panel px-3 py-2 sm:w-40 sm:flex-col sm:justify-center">
+      <div className="flex items-center gap-2 self-end sm:self-auto">
+        <div
+          className="flex min-w-0 max-w-28 items-center gap-1.5 text-right sm:max-w-48"
+          title={`Branch / Location: ${user.branchLocation || "Not set"}`}
+        >
+          <MapPin className="h-4 w-4 shrink-0 text-navy" aria-hidden="true" />
+          <div className="min-w-0">
+            <div className="hidden text-[10px] font-semibold uppercase text-slate-500 sm:block">
+              Branch / Location
+            </div>
+            <div className="truncate text-xs font-bold text-ink sm:text-sm">
+              {user.branchLocation || "Not set"}
+            </div>
+          </div>
+        </div>
         <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-full border border-line bg-white">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
@@ -130,19 +154,12 @@ export function Topbar({
             }}
           />
         </div>
-        <div className="min-w-0 text-right sm:text-center">
-          <div className="truncate text-sm font-black text-slate-950">{user.name}</div>
-          <div className="truncate text-xs text-slate-500">{user.role}</div>
-          <form action="/api/auth/logout" method="post">
-            <button
-              type="submit"
-              className="mt-1 inline-flex items-center gap-1.5 text-xs font-bold text-red-700 transition hover:text-red-900"
-            >
-              <LogOut className="h-3.5 w-3.5" aria-hidden="true" />
-              Sign Out
-            </button>
-          </form>
-        </div>
+        <form action="/api/auth/logout" method="post">
+          <button type="submit" className="btn-secondary px-3">
+            <LogOut className="h-4 w-4" aria-hidden="true" />
+            Sign Out
+          </button>
+        </form>
       </div>
     </header>
   );

@@ -23,6 +23,7 @@ export async function requireUser() {
       email: session.email,
       name: session.name,
       role: session.role,
+      branchLocation: session.branchLocation,
       profilePhotoUrl: session.profilePhotoUrl
     }
   };

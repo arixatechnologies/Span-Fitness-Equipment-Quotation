@@ -1,5 +1,6 @@
 import { GST_MODES } from "@/lib/constants";
 import { saveCompanySettingsAction } from "@/app/actions/settings";
+import { RequiredMark } from "@/components/required-mark";
 import { SubmitButton } from "@/components/submit-button";
 import type { CompanySettings } from "@/lib/types";
 
@@ -21,7 +22,10 @@ export function SettingsForm({
       {section === "company" ? (
         <div className="grid gap-4 md:grid-cols-2">
           <label>
-            <span className="field-label">Company Name</span>
+            <span className="field-label">
+              Company Name
+              <RequiredMark />
+            </span>
             <input
               className="field-input"
               name="company_name"
@@ -103,7 +107,10 @@ export function SettingsForm({
             />
           </label>
           <label>
-            <span className="field-label">Default GST %</span>
+            <span className="field-label">
+              Default GST %
+              <RequiredMark />
+            </span>
             <input
               className="field-input"
               name="default_gst_percent"
@@ -111,14 +118,19 @@ export function SettingsForm({
               min="0"
               step="0.01"
               defaultValue={settings.default_gst_percent}
+              required
             />
           </label>
           <label>
-            <span className="field-label">Default GST Mode</span>
+            <span className="field-label">
+              Default GST Mode
+              <RequiredMark />
+            </span>
             <select
               className="field-input"
               name="default_gst_mode"
               defaultValue={settings.default_gst_mode}
+              required
             >
               {GST_MODES.map((mode) => (
                 <option key={mode.value} value={mode.value}>
@@ -128,13 +140,17 @@ export function SettingsForm({
             </select>
           </label>
           <label>
-            <span className="field-label">Default Validity Days</span>
+            <span className="field-label">
+              Default Validity Days
+              <RequiredMark />
+            </span>
             <input
               className="field-input"
               name="default_validity_days"
               type="number"
               min="1"
               defaultValue={settings.default_validity_days}
+              required
             />
           </label>
           <label>

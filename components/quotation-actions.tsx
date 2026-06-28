@@ -10,7 +10,7 @@ import {
   MessageCircle,
   Pencil
 } from "lucide-react";
-import { formatCurrency } from "@/lib/format";
+import { formatCurrency, quotationDownloadBaseName } from "@/lib/format";
 
 export function QuotationActions({
   quotationId,
@@ -32,16 +32,6 @@ export function QuotationActions({
     "" | "generate" | "download" | "excel"
   >("");
   const loading = Boolean(pendingAction);
-
-  function cleanFilename(value: string) {
-    return (
-      value
-        .replace(/\[([^\]]+)\]\([^)]*\)/g, "$1")
-        .replace(/[^a-zA-Z0-9-]+/g, "-")
-        .replace(/-+/g, "-")
-        .replace(/^-|-$/g, "") || "quotation"
-    );
-  }
 
   async function generatePdf() {
     setPendingAction("generate");
@@ -83,7 +73,7 @@ export function QuotationActions({
       const url = URL.createObjectURL(blob);
       const anchor = document.createElement("a");
       anchor.href = url;
-      anchor.download = `${cleanFilename(quoteNumber)}.pdf`;
+      anchor.download = `${quotationDownloadBaseName(customerName, quoteNumber)}.pdf`;
       document.body.appendChild(anchor);
       anchor.click();
       anchor.remove();
@@ -111,7 +101,7 @@ export function QuotationActions({
       const url = URL.createObjectURL(blob);
       const anchor = document.createElement("a");
       anchor.href = url;
-      anchor.download = `${cleanFilename(quoteNumber)}.xlsx`;
+      anchor.download = `${quotationDownloadBaseName(customerName, quoteNumber)}.xlsx`;
       document.body.appendChild(anchor);
       anchor.click();
       anchor.remove();
