@@ -1,10 +1,10 @@
 "use client";
 
-import Image from "next/image";
 import { useMemo, useState } from "react";
 import { ChevronDown, Plus, Trash2 } from "lucide-react";
 import { saveQuotationAction } from "@/app/actions/quotations";
 import { PhoneInput } from "@/components/phone-input";
+import { ProductImage } from "@/components/product-image";
 import { RequiredMark } from "@/components/required-mark";
 import { StateCitySelects } from "@/components/state-city-selects";
 import { SubmitButton } from "@/components/submit-button";
@@ -618,19 +618,12 @@ export function QuotationBuilder({
                     />
                   </td>
                   <td className="px-1 py-3 text-center">
-                    {item.image_url ? (
-                      <Image
-                        src={item.image_url}
-                        alt={item.product_name || "Product image"}
-                        width={56}
-                        height={48}
-                        className="mx-auto h-12 w-14 object-contain"
-                      />
-                    ) : (
-                      <div className="mx-auto flex h-12 w-14 items-center justify-center bg-white text-[10px] font-bold text-slate-400">
-                        Image
-                      </div>
-                    )}
+                    <ProductImage
+                      src={item.image_url}
+                      alt={item.product_name || "Product image"}
+                      className="mx-auto h-12 w-14 object-contain"
+                      fallbackClassName="mx-auto flex h-12 w-14 items-center justify-center bg-white text-[10px] font-bold text-slate-400"
+                    />
                   </td>
                   <td className="px-2 py-3">
                     <input
@@ -773,19 +766,12 @@ export function QuotationBuilder({
               </div>
 
               <div className="mt-4 flex items-center gap-3">
-                {item.image_url ? (
-                  <Image
-                    src={item.image_url}
-                    alt={item.product_name || "Product image"}
-                    width={64}
-                    height={56}
-                    className="h-14 w-16 shrink-0 rounded-md border border-line bg-white object-contain"
-                  />
-                ) : (
-                  <div className="flex h-14 w-16 shrink-0 items-center justify-center rounded-md border border-line bg-white text-[10px] font-bold text-slate-400">
-                    Image
-                  </div>
-                )}
+                <ProductImage
+                  src={item.image_url}
+                  alt={item.product_name || "Product image"}
+                  className="h-14 w-16 shrink-0 rounded-md border border-line bg-white object-contain"
+                  fallbackClassName="flex h-14 w-16 shrink-0 items-center justify-center rounded-md border border-line bg-white text-[10px] font-bold text-slate-400"
+                />
                 <div className="min-w-0 text-xs text-slate-500">
                   <div className="truncate font-black text-slate-950">
                     {item.product_name || "Select a product"}

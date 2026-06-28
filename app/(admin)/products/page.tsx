@@ -1,9 +1,9 @@
-import Image from "next/image";
 import Link from "next/link";
 import { Edit, Plus, Trash2, Upload } from "lucide-react";
+import { ProductImage } from "@/components/product-image";
 import { ProductsExportButton } from "@/components/products-export";
 import { SearchField } from "@/components/search-field";
-import { EmptyState, ProductPlaceholder } from "@/components/ui";
+import { EmptyState } from "@/components/ui";
 import { softDeleteProductAction } from "@/app/actions/products";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { formatCurrency } from "@/lib/format";
@@ -106,17 +106,13 @@ export default async function ProductsPage({
             {productRows.map((product) => (
               <div key={product.id} className="rounded-md border border-line bg-white p-3">
                 <div className="flex gap-3">
-                  {product.image_url ? (
-                    <Image
-                      src={product.image_url}
-                      alt={product.product_name}
-                      width={64}
-                      height={64}
-                      className="h-16 w-16 shrink-0 rounded-md border border-line object-contain"
-                    />
-                  ) : (
-                    <ProductPlaceholder />
-                  )}
+                  <ProductImage
+                    src={product.image_url}
+                    alt={product.product_name}
+                    className="h-16 w-16 shrink-0 rounded-md border border-line object-contain"
+                    fallbackClassName="flex h-16 w-16 shrink-0 items-center justify-center rounded-md border border-line bg-panel text-xs font-black text-navy"
+                    fallbackLabel="SFE"
+                  />
                   <div className="min-w-0 flex-1">
                     <Link
                       href={`/products/${product.id}/edit`}
@@ -161,17 +157,13 @@ export default async function ProductsPage({
                   <tr key={product.id}>
                     <td className="table-cell">
                       <div className="flex items-center gap-3">
-                        {product.image_url ? (
-                          <Image
-                            src={product.image_url}
-                            alt={product.product_name}
-                            width={64}
-                            height={64}
-                            className="h-16 w-16 rounded-md border border-line object-contain"
-                          />
-                        ) : (
-                          <ProductPlaceholder />
-                        )}
+                        <ProductImage
+                          src={product.image_url}
+                          alt={product.product_name}
+                          className="h-16 w-16 shrink-0 rounded-md border border-line object-contain"
+                          fallbackClassName="flex h-16 w-16 shrink-0 items-center justify-center rounded-md border border-line bg-panel text-xs font-black text-navy"
+                          fallbackLabel="SFE"
+                        />
                         <div>
                           <Link
                             href={`/products/${product.id}/edit`}
