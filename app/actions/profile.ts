@@ -14,6 +14,11 @@ import {
 import { logActivity } from "@/lib/data";
 import { isTenDigitPhone, PHONE_VALIDATION_MESSAGE } from "@/lib/phone";
 import { requireUser } from "@/lib/supabase/server";
+import {
+  imageExtension,
+  imageUploadError,
+  MAX_FORM_IMAGE_BYTES
+} from "@/lib/upload-limits";
 
 const profileSchema = z.object({
   name: z.string().trim().min(2).max(100),
@@ -25,25 +30,16 @@ const profileSchema = z.object({
   branchLocation: z.string().trim().max(150)
 });
 
-const photoTypes: Record<string, string> = {
-  "image/jpeg": "jpg",
-  "image/png": "png",
-  "image/webp": "webp"
-};
-
 async function uploadProfilePhoto(supabase: any, file: File | null) {
   if (!file || file.size === 0) {
     return { url: null, path: null };
   }
 
-  if (file.size > 5 * 1024 * 1024) {
-    throw new Error("Profile photo must be 5 MB or smaller.");
-  }
+  const validationError = imageUploadError(file, MAX_FORM_IMAGE_BYTES);
+  if (validationError) throw new Error(validationError);
 
-  const extension = photoTypes[file.type];
-  if (!extension) {
-    throw new Error("Profile photo must be a JPEG, PNG, or WebP image.");
-  }
+  const extension = imageExtension(file);
+  if (!extension) throw new Error("Unsupported profile photo type.");
 
   const path = `profiles/${crypto.randomUUID()}.${extension}`;
   const { error } = await supabase.storage.from("member-photos").upload(path, file, {
@@ -144,30 +140,42 @@ export async function saveMyProfileAction(formData: FormData) {
     saveError = error;
     profileId = user.id;
   } else if (current) {
+    const payload: Record<string, unknown> = {
+      full_name: parsed.name,
+      phone_number: parsed.phoneNumber || null,
+      branch_location: parsed.branchLocation || null,
+      profile_photo_url: profilePhotoUrl,
+      profile_photo_path: profilePhotoPath,
+      role: user.role
+    };
+
+    if (password) {
+      payload.password_hash = await hashMemberPassword(password);
+    }
+
     const { error } = await supabase
       .from("profiles")
-      .update({
-        full_name: parsed.name,
-        phone_number: parsed.phoneNumber || null,
-        branch_location: parsed.branchLocation || null,
-        profile_photo_url: profilePhotoUrl,
-        profile_photo_path: profilePhotoPath,
-        role: user.role
-      })
+      .update(payload)
       .eq("id", current.id);
     saveError = error;
   } else {
+    const payload: Record<string, unknown> = {
+      full_name: parsed.name,
+      email: parsed.email,
+      phone_number: parsed.phoneNumber || null,
+      branch_location: parsed.branchLocation || null,
+      profile_photo_url: profilePhotoUrl,
+      profile_photo_path: profilePhotoPath,
+      role: user.role
+    };
+
+    if (password) {
+      payload.password_hash = await hashMemberPassword(password);
+    }
+
     const { data, error } = await supabase
       .from("profiles")
-      .insert({
-        full_name: parsed.name,
-        email: parsed.email,
-        phone_number: parsed.phoneNumber || null,
-        branch_location: parsed.branchLocation || null,
-        profile_photo_url: profilePhotoUrl,
-        profile_photo_path: profilePhotoPath,
-        role: user.role
-      })
+      .insert(payload)
       .select("id")
       .single();
     saveError = error;

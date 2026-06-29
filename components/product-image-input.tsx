@@ -2,6 +2,10 @@
 
 import { Link2, Upload } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import {
+  imageUploadError,
+  MAX_FORM_IMAGE_BYTES
+} from "@/lib/upload-limits";
 
 type ProductImageInputProps = {
   existingImageUrl?: string | null;
@@ -13,6 +17,7 @@ export function ProductImageInput({ existingImageUrl }: ProductImageInputProps) 
   const [imageUrl, setImageUrl] = useState(initialImageUrl);
   const [previewUrl, setPreviewUrl] = useState(initialImageUrl);
   const [previewFailed, setPreviewFailed] = useState(false);
+  const [fileError, setFileError] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -25,6 +30,17 @@ export function ProductImageInput({ existingImageUrl }: ProductImageInputProps) 
 
   function onImageChange(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
+    const validationError = file ? imageUploadError(file, MAX_FORM_IMAGE_BYTES) : "";
+
+    if (validationError) {
+      event.target.value = "";
+      setFileError(validationError);
+      setPreviewFailed(false);
+      setPreviewUrl(imageUrl);
+      return;
+    }
+
+    setFileError("");
     setPreviewFailed(false);
 
     setPreviewUrl((current) => {
@@ -51,6 +67,7 @@ export function ProductImageInput({ existingImageUrl }: ProductImageInputProps) 
       return imageUrl;
     });
     setPreviewFailed(false);
+    setFileError("");
     setMode(nextMode);
   }
 
@@ -114,6 +131,11 @@ export function ProductImageInput({ existingImageUrl }: ProductImageInputProps) 
               aria-label="Product image link"
             />
           )}
+          {fileError ? (
+            <p className="text-xs font-semibold text-red-600" role="alert">
+              {fileError}
+            </p>
+          ) : null}
         </div>
         <div
           className="flex h-28 w-28 items-center justify-center overflow-hidden rounded-md border border-line bg-panel text-center text-xs font-black text-slate-400 sm:h-32 sm:w-32"

@@ -64,35 +64,16 @@ async function hmac(message: string, secret: string) {
   return base64UrlEncode(signature);
 }
 
-async function sha256Hex(value: string) {
-  const digest = await crypto.subtle.digest("SHA-256", encoder.encode(value));
-  return Array.from(new Uint8Array(digest))
-    .map((byte) => byte.toString(16).padStart(2, "0"))
-    .join("");
-}
-
 export function getAuthSecret() {
-  return process.env.AUTH_SECRET || "";
+  const authSecret = process.env.AUTH_SECRET || "";
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
+
+  if (!serviceRoleKey) return authSecret;
+  return `${authSecret}:sfe-session:${serviceRoleKey}`;
 }
 
 export function getAdminEmail() {
   return process.env.ADMIN_EMAIL || "";
-}
-
-export async function isAdminPasswordValid(password: string) {
-  const plainPassword = process.env.ADMIN_PASSWORD;
-  const passwordHash = process.env.ADMIN_PASSWORD_HASH;
-
-  if (passwordHash?.startsWith("sha256:")) {
-    const inputHash = await sha256Hex(password);
-    return safeEqual(`sha256:${inputHash}`, passwordHash);
-  }
-
-  if (plainPassword) {
-    return safeEqual(password, plainPassword);
-  }
-
-  return false;
 }
 
 export async function createSessionToken(

@@ -9,6 +9,11 @@ import {
   PHONE_LIST_VALIDATION_MESSAGE
 } from "@/lib/phone";
 import { requireUser } from "@/lib/supabase/server";
+import {
+  imageExtension,
+  imageUploadError,
+  MAX_COMPANY_ASSET_BYTES
+} from "@/lib/upload-limits";
 
 function clean(value: FormDataEntryValue | null) {
   const text = String(value || "").trim();
@@ -30,7 +35,12 @@ async function uploadAsset(
     return existingUrl || null;
   }
 
-  const extension = file.name.split(".").pop()?.toLowerCase() || "png";
+  const validationError = imageUploadError(file, MAX_COMPANY_ASSET_BYTES);
+  if (validationError) throw new Error(validationError);
+
+  const extension = imageExtension(file);
+  if (!extension) throw new Error("Unsupported company image type.");
+
   const path = `${folder}/${crypto.randomUUID()}.${extension}`;
   const { error } = await supabase.storage.from("company-assets").upload(path, file, {
     contentType: file.type,

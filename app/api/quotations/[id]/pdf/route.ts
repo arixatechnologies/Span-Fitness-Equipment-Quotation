@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import serverlessChromium from "@sparticuz/chromium";
+import serverlessChromium from "@sparticuz/chromium-min";
 import { chromium } from "playwright-core";
 import { getQuotationWithItems, logActivity } from "@/lib/data";
 import { formatCustomerName, quotationDownloadBaseName } from "@/lib/format";
@@ -9,14 +9,22 @@ import { requireUser } from "@/lib/supabase/server";
 import type { CompanySettings, Customer } from "@/lib/types";
 
 export const runtime = "nodejs";
-export const maxDuration = 60;
+export const maxDuration = 120;
+
+const DEFAULT_CHROMIUM_PACK_URL =
+  "https://github.com/Sparticuz/chromium/releases/download/v149.0.0/chromium-v149.0.0-pack.x64.tar";
 
 async function launchPdfBrowser() {
   const isVercel = Boolean(process.env.VERCEL);
+  serverlessChromium.setGraphicsMode = false;
 
   return chromium.launch({
     args: isVercel ? serverlessChromium.args : [],
-    executablePath: isVercel ? await serverlessChromium.executablePath() : chromium.executablePath(),
+    executablePath: isVercel
+      ? await serverlessChromium.executablePath(
+          process.env.CHROMIUM_PACK_URL || DEFAULT_CHROMIUM_PACK_URL
+        )
+      : chromium.executablePath(),
     headless: true
   });
 }
@@ -102,6 +110,10 @@ async function storeQuotationPdf(supabase: any, id: string) {
     signed_url: shareResult.data.signedUrl,
     expires_at: expiresAt
   });
+
+  if (quotation.pdf_path && quotation.pdf_path !== path) {
+    await supabase.storage.from("quotation-pdfs").remove([quotation.pdf_path]);
+  }
 
   return {
     quotation,

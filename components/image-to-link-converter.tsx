@@ -31,6 +31,8 @@ import { RequiredMark } from "@/components/required-mark";
 const BOARD_SIZE = 1600;
 const MAX_SOURCE_SIZE = 25 * 1024 * 1024;
 const HISTORY_KEY = "image_tool_history";
+const DEFAULT_WORKER_URL =
+  "https://span-fitness-image-uploader.arixatechnologies.workers.dev/upload";
 
 type OutputFormat = "image/webp" | "image/jpeg" | "image/png";
 
@@ -417,13 +419,18 @@ export function ImageToLinkConverter() {
 
     const baseName = cleanBaseFilename(fileName);
     const filename = `${baseName}.${extensionFor(outputFormat)}`;
+    const key = `Hercules Fitness/${filename}`;
     const formData = new FormData();
     formData.append("file", blob, filename);
-    formData.append("fileName", baseName);
+    formData.append("key", key);
     setConverting(true);
 
     try {
-      const response = await fetch("/api/image-to-link", {
+      const workerUrl = (
+        process.env.NEXT_PUBLIC_IMAGE_UPLOAD_WORKER_URL || DEFAULT_WORKER_URL
+      ).replace(/\/+$/, "");
+      const uploadUrl = workerUrl.endsWith("/upload") ? workerUrl : `${workerUrl}/upload`;
+      const response = await fetch(uploadUrl, {
         method: "POST",
         body: formData
       });
@@ -434,12 +441,19 @@ export function ImageToLinkConverter() {
       }
 
       const item: UploadHistoryItem = {
-        fileName: result.fileName || filename,
-        key: result.key || "",
+        fileName: filename,
+        key: result.key || key,
         url: result.url,
         size: Number(result.size) || blob.size,
         createdAt: new Date().toISOString()
       };
+
+      await fetch("/api/image-to-link", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(item)
+      }).catch(() => null);
+
       setFinalLink(item.url);
       saveHistory(item);
       showToast("Image link is ready.");

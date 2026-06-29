@@ -4,12 +4,11 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { calculateQuotation } from "@/lib/calculations";
-import { getCompanySettings, getQuotationWithItems, logActivity } from "@/lib/data";
+import { getCompanySettings, logActivity } from "@/lib/data";
 import { discountLimitMessage, exceedsDiscountLimit } from "@/lib/discount-limit";
 import { isTenDigitPhone, PHONE_VALIDATION_MESSAGE } from "@/lib/phone";
-import { makeQuoteNumber, generateBaseQuoteNumber } from "@/lib/quotation-number";
 import { requireUser } from "@/lib/supabase/server";
-import type { Customer, GstMode, QuotationItemInput, QuotationStatus } from "@/lib/types";
+import type { GstMode, QuotationItemInput, QuotationStatus } from "@/lib/types";
 
 const itemSchema = z.object({
   product_id: z.string().uuid().nullable().optional(),
@@ -42,41 +41,41 @@ function clean(value: FormDataEntryValue | null) {
   return text ? text : null;
 }
 
-async function resolveCustomer(supabase: any, formData: FormData) {
+function customerInputFromForm(formData: FormData) {
   const customerId = clean(formData.get("customer_id"));
 
   if (customerId) {
-    const { data, error } = await supabase.from("customers").select("*").eq("id", customerId).single();
-    if (error) throw new Error(error.message);
-    return { customerId, customerSnapshot: data as Customer };
+    return {
+      customerId: z.string().uuid().parse(customerId),
+      customerPayload: null
+    };
   }
 
-  const payload = {
-    customer_name: z.string().min(1).parse(String(formData.get("new_customer_name") || "").trim()),
-    business_name: clean(formData.get("new_business_name")),
-    phone: phoneSchema.parse(String(formData.get("new_phone") || "")),
-    suffix: clean(formData.get("new_suffix")),
-    alternate_phone: phoneSchema.nullable().parse(clean(formData.get("new_alternate_phone"))),
-    email: clean(formData.get("new_email")),
-    gst_number: clean(formData.get("new_gst_number")),
-    address: clean(formData.get("new_address")),
-    city: clean(formData.get("new_city")),
-    state: clean(formData.get("new_state")),
-    pincode: clean(formData.get("new_pincode")),
-    notes: clean(formData.get("new_notes"))
+  return {
+    customerId: null,
+    customerPayload: {
+      customer_name: z
+        .string()
+        .min(1)
+        .parse(String(formData.get("new_customer_name") || "").trim()),
+      business_name: clean(formData.get("new_business_name")),
+      phone: phoneSchema.parse(String(formData.get("new_phone") || "")),
+      suffix: clean(formData.get("new_suffix")),
+      alternate_phone: phoneSchema.nullable().parse(clean(formData.get("new_alternate_phone"))),
+      email: clean(formData.get("new_email")),
+      gst_number: clean(formData.get("new_gst_number")),
+      address: clean(formData.get("new_address")),
+      city: clean(formData.get("new_city")),
+      state: clean(formData.get("new_state")),
+      pincode: clean(formData.get("new_pincode")),
+      notes: clean(formData.get("new_notes"))
+    }
   };
-
-  const { data, error } = await supabase.from("customers").insert(payload).select("*").single();
-  if (error) throw new Error(error.message);
-
-  return { customerId: data.id as string, customerSnapshot: data as Customer };
 }
 
 function quotationPayloadFromForm(
   formData: FormData,
   settings: Awaited<ReturnType<typeof getCompanySettings>>,
-  customerId: string | null,
-  customerSnapshot: Customer,
   calculated: ReturnType<typeof calculateQuotation>,
   status: QuotationStatus
 ) {
@@ -85,8 +84,6 @@ function quotationPayloadFromForm(
   return {
     quote_date: String(formData.get("quote_date") || new Date().toISOString().slice(0, 10)),
     validity_days: z.coerce.number().int().positive().parse(formData.get("validity_days")),
-    customer_id: customerId,
-    customer_snapshot: customerSnapshot,
     total_list_price: calculated.totals.total_list_price,
     discount_amount: calculated.totals.discount_amount,
     total_special_price: calculated.totals.total_special_price,
@@ -141,68 +138,15 @@ export async function saveQuotationAction(formData: FormData) {
   }
 
   const calculated = calculateQuotation(items, gstMode as GstMode);
-  const { customerId, customerSnapshot } = await resolveCustomer(supabase, formData);
+  const { customerId, customerPayload } = customerInputFromForm(formData);
   const basePayload = quotationPayloadFromForm(
     formData,
     settings,
-    customerId,
-    customerSnapshot,
     calculated,
     status
   );
 
-  let savedId = quotationId;
-
-  if (quotationId) {
-    const { error } = await supabase
-      .from("quotations")
-      .update({ ...basePayload, pdf_url: null, pdf_path: null })
-      .eq("id", quotationId);
-
-    if (error) throw new Error(error.message);
-
-    const { error: deleteItemsError } = await supabase
-      .from("quotation_items")
-      .delete()
-      .eq("quotation_id", quotationId);
-
-    if (deleteItemsError) throw new Error(deleteItemsError.message);
-
-    await logActivity(supabase, {
-      userId: user.id,
-      action: "Quotation edited",
-      entityType: "quotation",
-      entityId: quotationId
-    });
-  } else {
-    const baseQuoteNumber = await generateBaseQuoteNumber(supabase);
-    const quoteNumber = makeQuoteNumber(baseQuoteNumber, 0);
-
-    const { data, error } = await supabase
-      .from("quotations")
-      .insert({
-        ...basePayload,
-        base_quote_number: baseQuoteNumber,
-        revision: 0,
-        quote_number: quoteNumber,
-        created_by: user.id
-      })
-      .select("id")
-      .single();
-
-    if (error) throw new Error(error.message);
-    savedId = data.id as string;
-
-    await logActivity(supabase, {
-      userId: user.id,
-      action: "Quotation created",
-      entityType: "quotation",
-      entityId: savedId
-    });
-  }
-
   const itemPayload = calculated.items.map((item) => ({
-    quotation_id: savedId,
     product_id: item.product_id || null,
     sku: item.sku,
     product_name: item.product_name,
@@ -223,8 +167,48 @@ export async function saveQuotationAction(formData: FormData) {
     line_total: item.line_total
   }));
 
-  const { error: itemsError } = await supabase.from("quotation_items").insert(itemPayload);
-  if (itemsError) throw new Error(itemsError.message);
+  let previousFiles: { pdf_path: string | null; excel_path: string | null } | null = null;
+
+  if (quotationId) {
+    const { data, error } = await supabase
+      .from("quotations")
+      .select("pdf_path, excel_path")
+      .eq("id", quotationId)
+      .single();
+
+    if (error) throw new Error(error.message);
+    previousFiles = data;
+  }
+
+  const { data: savedId, error: saveError } = await supabase.rpc(
+    "save_quotation_transaction",
+    {
+      p_quotation_id: quotationId || null,
+      p_customer_id: customerId,
+      p_customer_payload: customerPayload,
+      p_quotation_payload: basePayload,
+      p_items: itemPayload,
+      p_created_by: user.id
+    }
+  );
+
+  if (saveError || typeof savedId !== "string") {
+    throw new Error(saveError?.message || "Unable to save quotation");
+  }
+
+  await logActivity(supabase, {
+    userId: user.id,
+    action: quotationId ? "Quotation edited" : "Quotation created",
+    entityType: "quotation",
+    entityId: savedId
+  });
+
+  if (previousFiles?.pdf_path) {
+    await supabase.storage.from("quotation-pdfs").remove([previousFiles.pdf_path]);
+  }
+  if (previousFiles?.excel_path) {
+    await supabase.storage.from("quotation-excels").remove([previousFiles.excel_path]);
+  }
 
   revalidatePath("/quotations");
   redirect(`/quotations/${savedId}/preview`);
@@ -233,58 +217,28 @@ export async function saveQuotationAction(formData: FormData) {
 export async function createRevisionAction(formData: FormData) {
   const { supabase, user } = await requireUser();
   const id = z.string().uuid().parse(formData.get("id"));
-  const { quotation, items } = await getQuotationWithItems(supabase, id);
-  const { data: revisions, error: revError } = await supabase
-    .from("quotations")
-    .select("revision")
-    .eq("base_quote_number", quotation.base_quote_number)
-    .order("revision", { ascending: false })
-    .limit(1);
+  const { data, error } = await supabase.rpc(
+    "create_quotation_revision_transaction",
+    {
+      p_source_quotation_id: id,
+      p_created_by: user.id
+    }
+  );
 
-  if (revError) throw new Error(revError.message);
-
-  const nextRevision = Number(revisions?.[0]?.revision || 0) + 1;
-  const quoteNumber = makeQuoteNumber(quotation.base_quote_number, nextRevision);
-  const { data, error } = await supabase
-    .from("quotations")
-    .insert({
-      ...quotation,
-      id: undefined,
-      revision: nextRevision,
-      quote_number: quoteNumber,
-      quote_date: new Date().toISOString().slice(0, 10),
-      status: "Draft",
-      pdf_url: null,
-      pdf_path: null,
-      created_by: user.id,
-      created_at: undefined,
-      updated_at: undefined
-    })
-    .select("id")
-    .single();
-
-  if (error) throw new Error(error.message);
-
-  const itemPayload = items.map((item) => ({
-    ...item,
-    id: undefined,
-    quotation_id: data.id,
-    created_at: undefined
-  }));
-
-  const { error: itemsError } = await supabase.from("quotation_items").insert(itemPayload);
-  if (itemsError) throw new Error(itemsError.message);
+  if (error || typeof data !== "string") {
+    throw new Error(error?.message || "Unable to create quotation revision");
+  }
 
   await logActivity(supabase, {
     userId: user.id,
     action: "Quotation revised",
     entityType: "quotation",
-    entityId: data.id,
-    metadata: { from: id, revision: nextRevision }
+    entityId: data,
+    metadata: { from: id }
   });
 
   revalidatePath("/quotations");
-  redirect(`/quotations/${data.id}/preview`);
+  redirect(`/quotations/${data}/preview`);
 }
 
 export async function updateQuotationStatusAction(formData: FormData) {
@@ -303,17 +257,20 @@ export async function deleteQuotationAction(formData: FormData) {
 
   const { data: quotation } = await supabase
     .from("quotations")
-    .select("pdf_path")
+    .select("pdf_path, excel_path")
     .eq("id", id)
     .maybeSingle();
-
-  if (quotation?.pdf_path) {
-    await supabase.storage.from("quotation-pdfs").remove([quotation.pdf_path]);
-  }
 
   const { error } = await supabase.from("quotations").delete().eq("id", id);
 
   if (error) throw new Error(error.message);
+
+  if (quotation?.pdf_path) {
+    await supabase.storage.from("quotation-pdfs").remove([quotation.pdf_path]);
+  }
+  if (quotation?.excel_path) {
+    await supabase.storage.from("quotation-excels").remove([quotation.excel_path]);
+  }
 
   await logActivity(supabase, {
     userId: user.id,

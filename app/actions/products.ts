@@ -6,6 +6,11 @@ import { z } from "zod";
 import { slugify } from "@/lib/format";
 import { logActivity } from "@/lib/data";
 import { requireUser } from "@/lib/supabase/server";
+import {
+  imageExtension,
+  imageUploadError,
+  MAX_FORM_IMAGE_BYTES
+} from "@/lib/upload-limits";
 
 const productSchema = z.object({
   id: z.string().uuid().optional().or(z.literal("")),
@@ -50,7 +55,12 @@ async function uploadImage(
     return existingUrl || null;
   }
 
-  const extension = file.name.split(".").pop()?.toLowerCase() || "jpg";
+  const validationError = imageUploadError(file, MAX_FORM_IMAGE_BYTES);
+  if (validationError) throw new Error(validationError);
+
+  const extension = imageExtension(file);
+  if (!extension) throw new Error("Unsupported product image type.");
+
   const path = `products/${crypto.randomUUID()}.${extension}`;
   const { error } = await supabase.storage.from("product-images").upload(path, file, {
     contentType: file.type,

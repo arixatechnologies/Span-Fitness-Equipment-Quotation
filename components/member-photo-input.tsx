@@ -2,6 +2,10 @@
 
 import { Camera } from "lucide-react";
 import { useEffect, useState } from "react";
+import {
+  imageUploadError,
+  MAX_FORM_IMAGE_BYTES
+} from "@/lib/upload-limits";
 
 export function MemberPhotoInput({
   existingPhotoUrl = ""
@@ -9,6 +13,7 @@ export function MemberPhotoInput({
   existingPhotoUrl?: string | null;
 }) {
   const [previewUrl, setPreviewUrl] = useState(existingPhotoUrl || "");
+  const [fileError, setFileError] = useState("");
 
   useEffect(() => {
     return () => {
@@ -20,6 +25,16 @@ export function MemberPhotoInput({
 
   function onPhotoChange(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
+    const validationError = file ? imageUploadError(file, MAX_FORM_IMAGE_BYTES) : "";
+
+    if (validationError) {
+      event.target.value = "";
+      setFileError(validationError);
+      setPreviewUrl(existingPhotoUrl || "");
+      return;
+    }
+
+    setFileError("");
 
     setPreviewUrl((current) => {
       if (current.startsWith("blob:")) {
@@ -53,6 +68,11 @@ export function MemberPhotoInput({
             accept="image/png,image/jpeg,image/webp"
             onChange={onPhotoChange}
           />
+          {fileError ? (
+            <p className="mt-1 text-xs font-semibold text-red-600" role="alert">
+              {fileError}
+            </p>
+          ) : null}
         </label>
       </div>
     </div>

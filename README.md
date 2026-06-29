@@ -57,8 +57,8 @@ SUPABASE_URL=https://your-project.supabase.co
 SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 NEXT_PUBLIC_SITE_URL=http://localhost:3000
 ADMIN_EMAIL=admin@spanfitness.com
-ADMIN_PASSWORD=change-this-password
 AUTH_SECRET=replace-with-a-long-random-secret
+CHROMIUM_PACK_URL=https://github.com/Sparticuz/chromium/releases/download/v149.0.0/chromium-v149.0.0-pack.x64.tar
 ```
 
 4. Apply Supabase migrations in order:
@@ -78,25 +78,28 @@ Or run the SQL files manually in Supabase SQL Editor:
 - `supabase/migrations/007_add_member_profile_photos.sql`
 - `supabase/migrations/008_add_account_profile_fields.sql`
 - `supabase/migrations/009_shorten_quotation_numbers.sql`
+- `supabase/migrations/010_add_member_discount_limit.sql`
+- `supabase/migrations/011_secure_admin_auth_and_login_throttling.sql`
+- `supabase/migrations/012_fix_login_throttle_function.sql`
+- `supabase/migrations/013_cleanup_stale_login_attempts.sql`
+- `supabase/migrations/014_transactional_quotations_and_excel_storage.sql`
 
 5. Set your admin login.
 
-The app does not use Supabase Auth. The main administrator uses `ADMIN_EMAIL` and
-`ADMIN_PASSWORD` from `.env`. Active team members use credentials stored in
-`team_members`, with salted password hashes. Both login paths create a signed HTTP-only
-cookie using `AUTH_SECRET`.
-
-For production, use a strong password and a long random `AUTH_SECRET`. You can also replace `ADMIN_PASSWORD` with `ADMIN_PASSWORD_HASH` using this format:
-
-```env
-ADMIN_PASSWORD_HASH=sha256:your-sha256-password-hash
-```
+The app does not use Supabase Auth. Main administrator and team-member passwords are
+stored only as salted PBKDF2-SHA256 hashes in Supabase. The main administrator hash is
+stored in `profiles.password_hash`; team-member hashes are stored in
+`team_members.password_hash`. Login attempts are throttled persistently in PostgreSQL.
+Sessions use signed HTTP-only cookies.
 
 6. Install Playwright Chromium for PDF generation:
 
 ```bash
 npx playwright install chromium
 ```
+
+Vercel uses `@sparticuz/chromium-min` and the configured Chromium pack URL instead of
+the local Playwright browser.
 
 7. Start the app:
 

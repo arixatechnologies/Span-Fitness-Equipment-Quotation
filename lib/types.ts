@@ -186,6 +186,7 @@ export type Quotation = {
   status: QuotationStatus;
   pdf_url: string | null;
   pdf_path: string | null;
+  excel_path: string | null;
   created_at: string;
   updated_at: string;
 };

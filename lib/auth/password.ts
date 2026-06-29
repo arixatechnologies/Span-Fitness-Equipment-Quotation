@@ -4,6 +4,9 @@ const ITERATIONS = 210_000;
 const SALT_BYTES = 16;
 const HASH_BYTES = 32;
 
+export const DUMMY_PASSWORD_HASH =
+  "pbkdf2:sha256:210000:4rV2_gCEftgv_zhtyNsQmA:zCkwQ2OevYBX9pr_y9jonOCkLkOLIwV9Aa9mO2zp6KQ";
+
 function encodeBase64Url(bytes: Uint8Array) {
   let binary = "";
 

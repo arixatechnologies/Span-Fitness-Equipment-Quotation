@@ -3,6 +3,8 @@ import { saveCompanySettingsAction } from "@/app/actions/settings";
 import { PhoneInput } from "@/components/phone-input";
 import { RequiredMark } from "@/components/required-mark";
 import { SubmitButton } from "@/components/submit-button";
+import { ValidatedImageFileInput } from "@/components/validated-image-file-input";
+import { MAX_COMPANY_ASSET_BYTES } from "@/lib/upload-limits";
 import type { CompanySettings } from "@/lib/types";
 
 export function SettingsForm({
@@ -82,21 +84,11 @@ export function SettingsForm({
           <HiddenCompanyFields settings={settings} />
           <label>
             <span className="field-label">Logo</span>
-            <input
-              className="field-input file:mr-3 file:rounded-md file:border-0 file:bg-rose file:px-3 file:py-1.5 file:text-sm file:font-semibold file:text-ink"
-              name="logo"
-              type="file"
-              accept="image/png,image/jpeg,image/webp"
-            />
+            <ValidatedImageFileInput name="logo" maxBytes={MAX_COMPANY_ASSET_BYTES} />
           </label>
           <label>
             <span className="field-label">Signature Image</span>
-            <input
-              className="field-input file:mr-3 file:rounded-md file:border-0 file:bg-rose file:px-3 file:py-1.5 file:text-sm file:font-semibold file:text-ink"
-              name="signature"
-              type="file"
-              accept="image/png,image/jpeg,image/webp"
-            />
+            <ValidatedImageFileInput name="signature" maxBytes={MAX_COMPANY_ASSET_BYTES} />
           </label>
           <label>
             <span className="field-label">Theme Color</span>

@@ -95,15 +95,13 @@ export function QuotationActions({
         return;
       }
 
-      const blob = await response.blob();
-      const url = URL.createObjectURL(blob);
+      const result = await response.json();
       const anchor = document.createElement("a");
-      anchor.href = url;
+      anchor.href = result.url;
       anchor.download = `${quotationDownloadBaseName(customerName, quoteNumber)}.xlsx`;
       document.body.appendChild(anchor);
       anchor.click();
       anchor.remove();
-      URL.revokeObjectURL(url);
     } catch {
       alert("Unable to download Excel");
     } finally {

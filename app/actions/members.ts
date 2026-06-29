@@ -8,6 +8,11 @@ import { getAdminEmail } from "@/lib/auth/session";
 import { logActivity } from "@/lib/data";
 import { isTenDigitPhone, PHONE_VALIDATION_MESSAGE } from "@/lib/phone";
 import { requireAdmin } from "@/lib/supabase/server";
+import {
+  imageExtension,
+  imageUploadError,
+  MAX_FORM_IMAGE_BYTES
+} from "@/lib/upload-limits";
 
 const memberSchema = z.object({
   member_name: z.string().trim().min(2).max(100),
@@ -20,25 +25,16 @@ const memberSchema = z.object({
   status: z.enum(["active", "inactive"])
 });
 
-const memberPhotoTypes: Record<string, string> = {
-  "image/jpeg": "jpg",
-  "image/png": "png",
-  "image/webp": "webp"
-};
-
 async function uploadMemberPhoto(supabase: any, file: File | null) {
   if (!file || file.size === 0) {
     return { url: null, path: null };
   }
 
-  if (file.size > 5 * 1024 * 1024) {
-    throw new Error("Profile photo must be 5 MB or smaller.");
-  }
+  const validationError = imageUploadError(file, MAX_FORM_IMAGE_BYTES);
+  if (validationError) throw new Error(validationError);
 
-  const extension = memberPhotoTypes[file.type];
-  if (!extension) {
-    throw new Error("Profile photo must be a JPEG, PNG, or WebP image.");
-  }
+  const extension = imageExtension(file);
+  if (!extension) throw new Error("Unsupported profile photo type.");
 
   const path = `members/${crypto.randomUUID()}.${extension}`;
   const { error } = await supabase.storage.from("member-photos").upload(path, file, {
