@@ -61,7 +61,9 @@ export function QuotationActions({
     setPendingAction("download");
 
     try {
-      const response = await fetch(`/api/quotations/${quotationId}/pdf`);
+      const response = await fetch(`/api/quotations/${quotationId}/pdf?download=1`, {
+        method: "POST"
+      });
 
       if (!response.ok) {
         const result = await response.json().catch(() => null);
@@ -87,7 +89,9 @@ export function QuotationActions({
     setPendingAction("excel");
 
     try {
-      const response = await fetch(`/api/quotations/${quotationId}/excel`);
+      const response = await fetch(`/api/quotations/${quotationId}/excel`, {
+        method: "POST"
+      });
 
       if (!response.ok) {
         const result = await response.json().catch(() => null);

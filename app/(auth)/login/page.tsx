@@ -5,6 +5,7 @@ import styles from "./login.module.css";
 const errorMessages: Record<string, string> = {
   invalid: "Invalid admin email or password.",
   rate_limited: "Too many login attempts. Please wait and try again.",
+  session_expired: "Your session is no longer active. Please sign in again.",
   config: "Admin authentication is not configured.",
   unknown: "Unable to sign in. Please try again."
 };
@@ -46,10 +47,6 @@ export default async function LoginPage({
         <h1 className={styles.title}>Welcome Back</h1>
 
         <LoginForm redirectedFrom={redirectedFrom} error={error} />
-
-        <div className={styles.foot}>
-          Don&apos;t have an account? <a href="#">Create account</a>
-        </div>
       </section>
     </main>
   );

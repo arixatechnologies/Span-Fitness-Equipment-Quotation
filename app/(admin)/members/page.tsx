@@ -1,9 +1,9 @@
-import { Power, Trash2, UserPlus } from "lucide-react";
+import { Power, UserPlus } from "lucide-react";
 import {
   addMemberAction,
-  deleteMemberAction,
   toggleMemberStatusAction
 } from "@/app/actions/members";
+import { ConfirmDeleteButton } from "@/components/confirm-delete-button";
 import { MemberPhotoInput } from "@/components/member-photo-input";
 import { PhoneInput } from "@/components/phone-input";
 import { RequiredMark } from "@/components/required-mark";
@@ -217,13 +217,13 @@ export default async function MembersPage() {
                         {member.status === "active" ? "Deactivate" : "Activate"}
                       </SubmitButton>
                     </form>
-                    <form action={deleteMemberAction}>
-                      <input type="hidden" name="id" value={member.id} />
-                      <SubmitButton className="btn-danger w-full px-3" pendingLabel="Deleting...">
-                        <Trash2 className="h-4 w-4" aria-hidden="true" />
-                        Delete
-                      </SubmitButton>
-                    </form>
+                    <ConfirmDeleteButton
+                      entity="member"
+                      id={member.id}
+                      itemName={member.member_name}
+                      className="btn-danger w-full px-3"
+                      showLabel
+                    />
                   </div>
                 </article>
               ))}
@@ -279,17 +279,11 @@ export default async function MembersPage() {
                               <Power className="h-4 w-4" aria-hidden="true" />
                             </SubmitButton>
                           </form>
-                          <form action={deleteMemberAction}>
-                            <input type="hidden" name="id" value={member.id} />
-                            <SubmitButton
-                              className="btn-danger px-3"
-                              pendingLabel=""
-                              title="Delete"
-                              aria-label={`Delete ${member.member_name}`}
-                            >
-                              <Trash2 className="h-4 w-4" aria-hidden="true" />
-                            </SubmitButton>
-                          </form>
+                          <ConfirmDeleteButton
+                            entity="member"
+                            id={member.id}
+                            itemName={member.member_name}
+                          />
                         </div>
                       </td>
                     </tr>

@@ -2,13 +2,12 @@ import Link from "next/link";
 import {
   FileText,
   Pencil,
-  RefreshCcw,
-  Trash2
+  RefreshCcw
 } from "lucide-react";
 import {
-  createRevisionAction,
-  deleteQuotationAction
+  createRevisionAction
 } from "@/app/actions/quotations";
+import { ConfirmDeleteButton } from "@/components/confirm-delete-button";
 import { QuotationActions } from "@/components/quotation-actions";
 import { StatusBadge } from "@/components/ui";
 import { getQuotationWithItems } from "@/lib/data";
@@ -57,13 +56,13 @@ export default async function QuotationDetailPage({ params }: { params: Promise<
               Create Revision
             </button>
           </form>
-          <form action={deleteQuotationAction}>
-            <input type="hidden" name="id" value={quotation.id} />
-            <button type="submit" className="btn-danger" title="Delete">
-              <Trash2 className="h-4 w-4" />
-              Delete
-            </button>
-          </form>
+          <ConfirmDeleteButton
+            entity="quotation"
+            id={quotation.id}
+            itemName={quotation.quote_number}
+            className="btn-danger"
+            showLabel
+          />
         </div>
       </div>
 

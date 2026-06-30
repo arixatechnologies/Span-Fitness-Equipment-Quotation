@@ -97,32 +97,28 @@ export function MyProfileForm({
           />
         </label>
 
-        {isMember ? (
-          <>
-            <label htmlFor="profile-password">
-              <span className="field-label">New Password</span>
-              <input
-                id="profile-password"
-                className="field-input"
-                name="new_password"
-                type="password"
-                minLength={8}
-                autoComplete="new-password"
-              />
-            </label>
-            <label htmlFor="profile-confirm-password">
-              <span className="field-label">Confirm New Password</span>
-              <input
-                id="profile-confirm-password"
-                className="field-input"
-                name="confirm_password"
-                type="password"
-                minLength={8}
-                autoComplete="new-password"
-              />
-            </label>
-          </>
-        ) : null}
+        <label htmlFor="profile-password">
+          <span className="field-label">New Password</span>
+          <input
+            id="profile-password"
+            className="field-input"
+            name="new_password"
+            type="password"
+            minLength={8}
+            autoComplete="new-password"
+          />
+        </label>
+        <label htmlFor="profile-confirm-password">
+          <span className="field-label">Confirm New Password</span>
+          <input
+            id="profile-confirm-password"
+            className="field-input"
+            name="confirm_password"
+            type="password"
+            minLength={8}
+            autoComplete="new-password"
+          />
+        </label>
       </div>
 
       <div className="mt-6 flex justify-end">

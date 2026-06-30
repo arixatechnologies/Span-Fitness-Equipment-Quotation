@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { slugify } from "@/lib/format";
 import { logActivity } from "@/lib/data";
+import { isSafeProductImageUrl } from "@/lib/product-image-url";
 import { requireUser } from "@/lib/supabase/server";
 import {
   imageExtension,
@@ -19,7 +20,13 @@ const productSchema = z.object({
   brand_id: z.string().uuid().nullable().optional(),
   category_id: z.string().uuid().nullable().optional(),
   sub_category_id: z.string().uuid().nullable().optional(),
-  image_url: z.string().url().nullable().optional().or(z.literal("")),
+  image_url: z
+    .string()
+    .url()
+    .refine(isSafeProductImageUrl, "Product image link must use a public HTTPS URL.")
+    .nullable()
+    .optional()
+    .or(z.literal("")),
   unit_price: z.coerce.number().min(0),
   special_price: z.coerce.number().min(0).optional(),
   gst_percent: z.coerce.number().min(0).max(100).default(18),
@@ -45,6 +52,9 @@ const importRowSchema = z.object({
   stock_availability: z.string().optional().default("In Stock"),
   status: z.enum(["active", "inactive"]).default("active")
 });
+
+const productIdSchema = z.string().uuid();
+const bulkProductIdsSchema = z.array(productIdSchema).min(1).max(500);
 
 async function uploadImage(
   supabase: any,
@@ -154,12 +164,13 @@ export async function saveProductAction(formData: FormData) {
 
 export async function softDeleteProductAction(formData: FormData) {
   const { supabase, user } = await requireUser();
-  const id = z.string().uuid().parse(formData.get("id"));
+  const id = productIdSchema.parse(formData.get("id"));
 
   const { error } = await supabase
     .from("products")
     .update({ deleted_at: new Date().toISOString(), status: "inactive" })
-    .eq("id", id);
+    .eq("id", id)
+    .is("deleted_at", null);
 
   if (error) throw new Error(error.message);
 
@@ -168,6 +179,35 @@ export async function softDeleteProductAction(formData: FormData) {
     action: "Product deleted",
     entityType: "product",
     entityId: id
+  });
+
+  revalidatePath("/products");
+}
+
+export async function bulkSoftDeleteProductsAction(formData: FormData) {
+  const { supabase, user } = await requireUser();
+  const rawIds = JSON.parse(String(formData.get("ids") || "[]"));
+  const ids = [...new Set(bulkProductIdsSchema.parse(rawIds))];
+
+  const { data, error } = await supabase
+    .from("products")
+    .update({ deleted_at: new Date().toISOString(), status: "inactive" })
+    .in("id", ids)
+    .is("deleted_at", null)
+    .select("id");
+
+  if (error) throw new Error(error.message);
+
+  const deletedIds = (data || []).map((product: { id: string }) => product.id);
+
+  await logActivity(supabase, {
+    userId: user.id,
+    action: "Products deleted",
+    entityType: "product",
+    metadata: {
+      count: deletedIds.length,
+      productIds: deletedIds
+    }
   });
 
   revalidatePath("/products");

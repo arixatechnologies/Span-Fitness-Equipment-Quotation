@@ -1,6 +1,6 @@
 import Link from "next/link";
-import { Eye, Pencil, Plus, Trash2 } from "lucide-react";
-import { deleteQuotationAction } from "@/app/actions/quotations";
+import { Eye, Pencil, Plus } from "lucide-react";
+import { ConfirmDeleteButton } from "@/components/confirm-delete-button";
 import { SearchField } from "@/components/search-field";
 import { EmptyState, StatusBadge } from "@/components/ui";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
@@ -133,17 +133,12 @@ export default async function QuotationsPage({
                     >
                       <Pencil className="h-4 w-4" />
                     </Link>
-                    <form action={deleteQuotationAction}>
-                      <input type="hidden" name="id" value={quotation.id} />
-                      <button
-                        type="submit"
-                        className="btn-danger w-full px-3"
-                        title="Delete"
-                        aria-label={`Delete ${quotation.quote_number}`}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
-                    </form>
+                    <ConfirmDeleteButton
+                      entity="quotation"
+                      id={quotation.id}
+                      itemName={quotation.quote_number}
+                      className="btn-danger w-full px-3"
+                    />
                   </div>
                 </div>
               );
@@ -218,17 +213,11 @@ export default async function QuotationsPage({
                           >
                             <Pencil className="h-4 w-4" />
                           </Link>
-                          <form action={deleteQuotationAction}>
-                            <input type="hidden" name="id" value={quotation.id} />
-                            <button
-                              type="submit"
-                              className="btn-danger px-3"
-                              title="Delete"
-                              aria-label={`Delete ${quotation.quote_number}`}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </button>
-                          </form>
+                          <ConfirmDeleteButton
+                            entity="quotation"
+                            id={quotation.id}
+                            itemName={quotation.quote_number}
+                          />
                         </div>
                       </td>
                     </tr>

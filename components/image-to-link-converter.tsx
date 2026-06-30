@@ -419,7 +419,7 @@ export function ImageToLinkConverter() {
 
     const baseName = cleanBaseFilename(fileName);
     const filename = `${baseName}.${extensionFor(outputFormat)}`;
-    const key = `Hercules Fitness/${filename}`;
+    const key = `Excel Let's Play/${filename}`;
     const formData = new FormData();
     formData.append("file", blob, filename);
     formData.append("key", key);

@@ -10,7 +10,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test:e2e": "node scripts/e2e-audit.mjs"
   },
   "dependencies": {
     "@sparticuz/chromium-min": "149.0.0",

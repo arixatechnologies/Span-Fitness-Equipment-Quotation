@@ -1,6 +1,6 @@
 import Link from "next/link";
-import { Edit, Plus, Trash2 } from "lucide-react";
-import { deleteCustomerAction } from "@/app/actions/customers";
+import { Edit, Plus } from "lucide-react";
+import { ConfirmDeleteButton } from "@/components/confirm-delete-button";
 import { SearchField } from "@/components/search-field";
 import { EmptyState } from "@/components/ui";
 import { formatCustomerName } from "@/lib/format";
@@ -80,13 +80,13 @@ export default async function CustomersPage({
                     <Edit className="h-4 w-4" />
                     Edit
                   </Link>
-                  <form action={deleteCustomerAction}>
-                    <input type="hidden" name="id" value={customer.id} />
-                    <button type="submit" className="btn-danger w-full px-3">
-                      <Trash2 className="h-4 w-4" />
-                      Delete
-                    </button>
-                  </form>
+                  <ConfirmDeleteButton
+                    entity="customer"
+                    id={customer.id}
+                    itemName={formatCustomerName(customer)}
+                    className="btn-danger w-full px-3"
+                    showLabel
+                  />
                 </div>
               </div>
             ))}
@@ -123,12 +123,11 @@ export default async function CustomersPage({
                         <Link href={`/customers/${customer.id}/edit`} className="btn-secondary px-3">
                           <Edit className="h-4 w-4" />
                         </Link>
-                        <form action={deleteCustomerAction}>
-                          <input type="hidden" name="id" value={customer.id} />
-                          <button type="submit" className="btn-danger px-3">
-                            <Trash2 className="h-4 w-4" />
-                          </button>
-                        </form>
+                        <ConfirmDeleteButton
+                          entity="customer"
+                          id={customer.id}
+                          itemName={formatCustomerName(customer)}
+                        />
                       </div>
                     </td>
                   </tr>

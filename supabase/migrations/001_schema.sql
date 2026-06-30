@@ -198,34 +198,42 @@ create table if not exists public.activity_logs (
   created_at timestamptz not null default now()
 );
 
+drop trigger if exists profiles_set_updated_at on public.profiles;
 create trigger profiles_set_updated_at
 before update on public.profiles
 for each row execute function public.set_updated_at();
 
+drop trigger if exists brands_set_updated_at on public.brands;
 create trigger brands_set_updated_at
 before update on public.brands
 for each row execute function public.set_updated_at();
 
+drop trigger if exists categories_set_updated_at on public.categories;
 create trigger categories_set_updated_at
 before update on public.categories
 for each row execute function public.set_updated_at();
 
+drop trigger if exists products_set_updated_at on public.products;
 create trigger products_set_updated_at
 before update on public.products
 for each row execute function public.set_updated_at();
 
+drop trigger if exists customers_set_updated_at on public.customers;
 create trigger customers_set_updated_at
 before update on public.customers
 for each row execute function public.set_updated_at();
 
+drop trigger if exists company_settings_set_updated_at on public.company_settings;
 create trigger company_settings_set_updated_at
 before update on public.company_settings
 for each row execute function public.set_updated_at();
 
+drop trigger if exists brand_footer_logos_set_updated_at on public.brand_footer_logos;
 create trigger brand_footer_logos_set_updated_at
 before update on public.brand_footer_logos
 for each row execute function public.set_updated_at();
 
+drop trigger if exists quotations_set_updated_at on public.quotations;
 create trigger quotations_set_updated_at
 before update on public.quotations
 for each row execute function public.set_updated_at();

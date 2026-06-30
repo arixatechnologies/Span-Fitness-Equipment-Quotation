@@ -1,12 +1,10 @@
 import Link from "next/link";
-import { Edit, Plus, Trash2, Upload } from "lucide-react";
-import { ProductImage } from "@/components/product-image";
+import { Plus, Upload } from "lucide-react";
+import { ProductsList } from "@/components/products-list";
 import { ProductsExportButton } from "@/components/products-export";
 import { SearchField } from "@/components/search-field";
 import { EmptyState } from "@/components/ui";
-import { softDeleteProductAction } from "@/app/actions/products";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
-import { formatCurrency } from "@/lib/format";
 import { getSearchText } from "@/lib/search";
 import type { Product } from "@/lib/types";
 
@@ -101,103 +99,10 @@ export default async function ProductsPage({
       </form>
 
       {productRows.length ? (
-        <section className="panel overflow-hidden">
-          <div className="grid gap-3 p-3 md:hidden">
-            {productRows.map((product) => (
-              <div key={product.id} className="rounded-md border border-line bg-white p-3">
-                <div className="flex gap-3">
-                  <ProductImage
-                    src={product.image_url}
-                    alt={product.product_name}
-                    className="h-16 w-16 shrink-0 rounded-md border border-line object-contain"
-                    fallbackClassName="flex h-16 w-16 shrink-0 items-center justify-center rounded-md border border-line bg-panel text-xs font-black text-navy"
-                    fallbackLabel="SFE"
-                  />
-                  <div className="min-w-0 flex-1">
-                    <Link
-                      href={`/products/${product.id}/edit`}
-                      className="block truncate font-black text-slate-950 hover:text-navy"
-                    >
-                      {product.product_name}
-                    </Link>
-                    <div className="mt-1 text-xs text-slate-500">{product.sku}</div>
-                    <div className="mt-2 text-sm text-slate-600">{product.brand?.name || "-"}</div>
-                    <div className="mt-1 font-black text-navy">{formatCurrency(product.unit_price)}</div>
-                  </div>
-                </div>
-                <div className="mt-3 grid grid-cols-2 gap-2">
-                  <Link href={`/products/${product.id}/edit`} className="btn-secondary w-full px-3">
-                    <Edit className="h-4 w-4" />
-                    Edit
-                  </Link>
-                  <form action={softDeleteProductAction}>
-                    <input type="hidden" name="id" value={product.id} />
-                    <button className="btn-danger w-full px-3" type="submit">
-                      <Trash2 className="h-4 w-4" />
-                      Delete
-                    </button>
-                  </form>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          <div className="hidden overflow-x-auto md:block">
-            <table className="w-full min-w-[820px]">
-              <thead className="table-head">
-                <tr>
-                  <th className="px-4 py-3">Product</th>
-                  <th className="px-4 py-3">Brand</th>
-                  <th className="px-4 py-3 text-right">Unit Price</th>
-                  <th className="px-4 py-3 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {productRows.map((product) => (
-                  <tr key={product.id}>
-                    <td className="table-cell">
-                      <div className="flex items-center gap-3">
-                        <ProductImage
-                          src={product.image_url}
-                          alt={product.product_name}
-                          className="h-16 w-16 shrink-0 rounded-md border border-line object-contain"
-                          fallbackClassName="flex h-16 w-16 shrink-0 items-center justify-center rounded-md border border-line bg-panel text-xs font-black text-navy"
-                          fallbackLabel="SFE"
-                        />
-                        <div>
-                          <Link
-                            href={`/products/${product.id}/edit`}
-                            className="font-black text-slate-950 hover:text-navy"
-                          >
-                            {product.product_name}
-                          </Link>
-                          <div className="text-xs text-slate-500">{product.sku}</div>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="table-cell">{product.brand?.name || "-"}</td>
-                    <td className="table-cell text-right font-semibold">
-                      {formatCurrency(product.unit_price)}
-                    </td>
-                    <td className="table-cell">
-                      <div className="flex justify-end gap-2">
-                        <Link href={`/products/${product.id}/edit`} className="btn-secondary px-3">
-                          <Edit className="h-4 w-4" />
-                        </Link>
-                        <form action={softDeleteProductAction}>
-                          <input type="hidden" name="id" value={product.id} />
-                          <button className="btn-danger px-3" type="submit">
-                            <Trash2 className="h-4 w-4" />
-                          </button>
-                        </form>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </section>
+        <ProductsList
+          key={productRows.map((product) => product.id).join(":")}
+          products={productRows}
+        />
       ) : (
         <EmptyState
           title="No products found"

@@ -124,49 +124,42 @@ async function storeQuotationPdf(supabase: any, id: string) {
   };
 }
 
-export async function POST(_request: Request, { params }: { params: Promise<{ id: string }> }) {
+export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
+  const isDownload = new URL(request.url).searchParams.get("download") === "1";
 
   try {
     const { supabase, user } = await requireUser();
-    const { quotation, path, shareUrl, downloadUrl } = await storeQuotationPdf(supabase, id);
+    const { quotation, path, shareUrl, downloadUrl, filename } =
+      await storeQuotationPdf(supabase, id);
 
     await logActivity(supabase, {
       userId: user.id,
-      action: "Quotation PDF generated",
+      action: isDownload ? "Quotation PDF downloaded" : "Quotation PDF generated",
       entityType: "quotation",
       entityId: quotation.id
     });
 
-    return NextResponse.json({ url: shareUrl, downloadUrl, path });
+    return NextResponse.json({
+      url: isDownload ? downloadUrl : shareUrl,
+      downloadUrl,
+      path,
+      filename
+    });
   } catch (error) {
-    console.error("Quotation PDF generation failed", error);
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Unable to generate PDF" },
-      { status: 500 }
+    console.error(
+      isDownload ? "Quotation PDF download failed" : "Quotation PDF generation failed",
+      error
     );
-  }
-}
-
-export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params;
-
-  try {
-    const { supabase, user } = await requireUser();
-    const { quotation, downloadUrl, filename } = await storeQuotationPdf(supabase, id);
-
-    await logActivity(supabase, {
-      userId: user.id,
-      action: "Quotation PDF downloaded",
-      entityType: "quotation",
-      entityId: quotation.id
-    });
-
-    return NextResponse.json({ url: downloadUrl, filename });
-  } catch (error) {
-    console.error("Quotation PDF download failed", error);
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Unable to download PDF" },
+      {
+        error:
+          error instanceof Error
+            ? error.message
+            : isDownload
+              ? "Unable to download PDF"
+              : "Unable to generate PDF"
+      },
       { status: 500 }
     );
   }

@@ -176,6 +176,15 @@ npm run build
 npm audit --omit=dev
 ```
 
+With the local development server running, execute the authenticated browser suite:
+
+```bash
+npm run test:e2e
+```
+
+The E2E suite uses the configured Supabase project. It creates uniquely named temporary
+members, products, customers, quotations, PDFs, and Excel files, then removes them.
+
 ## Testing Checklist
 
 - Add product.

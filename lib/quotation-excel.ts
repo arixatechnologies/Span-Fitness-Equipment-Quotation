@@ -11,6 +11,7 @@ import ExcelJS, {
   type Worksheet
 } from "exceljs";
 import { formatCustomerName } from "@/lib/format";
+import { isSafeProductImageUrl } from "@/lib/product-image-url";
 import type {
   CompanySettings,
   Customer,
@@ -203,16 +204,30 @@ function imageExtension(buffer: Buffer): WorkbookImage["extension"] | null {
   return null;
 }
 
-function isBlockedImageHost(hostname: string) {
-  const host = hostname.toLowerCase().replace(/^\[|\]$/g, "");
-  if (host === "localhost" || host === "::1" || host.endsWith(".local")) return true;
-  if (/^127\./.test(host) || /^10\./.test(host) || /^192\.168\./.test(host)) return true;
-  if (/^169\.254\./.test(host)) return true;
+async function fetchPublicImage(url: URL, redirectCount = 0): Promise<Response | null> {
+  if (!isSafeProductImageUrl(url.toString()) || redirectCount > 3) return null;
 
-  const private172 = host.match(/^172\.(\d{1,3})\./);
-  if (private172 && Number(private172[1]) >= 16 && Number(private172[1]) <= 31) return true;
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 6000);
 
-  return /^(fc|fd|fe80):/i.test(host);
+  try {
+    const response = await fetch(url, {
+      cache: "no-store",
+      redirect: "manual",
+      signal: controller.signal
+    });
+
+    if (response.status >= 300 && response.status < 400) {
+      const location = response.headers.get("location");
+      return location
+        ? fetchPublicImage(new URL(location, url), redirectCount + 1)
+        : null;
+    }
+
+    return response.ok ? response : null;
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 async function loadProductImage(imageUrl: string): Promise<WorkbookImage | null> {
@@ -229,32 +244,17 @@ async function loadProductImage(imageUrl: string): Promise<WorkbookImage | null>
     }
 
     const url = new URL(imageUrl);
-    if (!["http:", "https:"].includes(url.protocol) || isBlockedImageHost(url.hostname)) {
-      return null;
-    }
+    const response = await fetchPublicImage(url);
+    if (!response) return null;
 
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 6000);
+    const declaredLength = Number(response.headers.get("content-length") || 0);
+    if (declaredLength > MAX_IMAGE_BYTES) return null;
 
-    try {
-      const response = await fetch(url, {
-        cache: "no-store",
-        redirect: "follow",
-        signal: controller.signal
-      });
-      if (!response.ok) return null;
+    const buffer = Buffer.from(await response.arrayBuffer());
+    if (!buffer.length || buffer.length > MAX_IMAGE_BYTES) return null;
 
-      const declaredLength = Number(response.headers.get("content-length") || 0);
-      if (declaredLength > MAX_IMAGE_BYTES) return null;
-
-      const buffer = Buffer.from(await response.arrayBuffer());
-      if (!buffer.length || buffer.length > MAX_IMAGE_BYTES) return null;
-
-      const extension = imageExtension(buffer);
-      return extension ? { buffer, extension } : null;
-    } finally {
-      clearTimeout(timeout);
-    }
+    const extension = imageExtension(buffer);
+    return extension ? { buffer, extension } : null;
   } catch {
     return null;
   }

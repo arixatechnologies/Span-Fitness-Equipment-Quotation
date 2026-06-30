@@ -96,16 +96,6 @@ export function LoginForm({ redirectedFrom, error }: LoginFormProps) {
         </div>
       </div>
 
-      <div className={styles.row}>
-        <label className={styles.remember}>
-          <input type="checkbox" name="remember" defaultChecked />
-          <span>Remember me</span>
-        </label>
-        <a href="#" aria-disabled="true">
-          Forgot password?
-        </a>
-      </div>
-
       {error ? <div className={styles.error}>{error}</div> : null}
 
       <button

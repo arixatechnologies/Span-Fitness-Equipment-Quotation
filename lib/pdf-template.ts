@@ -1,6 +1,7 @@
 import type { CompanySettings, Customer, Quotation, QuotationItem } from "@/lib/types";
 import { formatCustomerName, formatDate } from "@/lib/format";
 import type { PdfChromeImages } from "@/lib/pdf-assets";
+import { isSafeProductImageUrl } from "@/lib/product-image-url";
 
 type PdfTemplateInput = {
   quotation: Quotation;
@@ -68,7 +69,7 @@ function productBrand(item: QuotationItem, settings: CompanySettings) {
 }
 
 function productImage(item: QuotationItem) {
-  if (!item.image_url) {
+  if (!item.image_url || !isSafeProductImageUrl(item.image_url)) {
     return `<div class="product-fallback">SFE</div>`;
   }
 
@@ -183,20 +184,28 @@ function chunk<T>(items: T[], size: number) {
 function splitProductPages(items: QuotationItem[]) {
   const first = items.slice(0, 4);
   const remaining = items.slice(4);
+  const continuationPageSize = 5;
+  const maxSummaryProducts = 3;
 
   if (!remaining.length) {
     return { first, middle: [] as QuotationItem[][], final: [] as QuotationItem[] };
   }
 
-  const finalCount = remaining.length % 4;
-  if (finalCount === 0) {
-    return { first, middle: chunk(remaining, 4), final: [] as QuotationItem[] };
+  const remainder = remaining.length % continuationPageSize;
+  const finalCount = remainder > 0 && remainder <= maxSummaryProducts ? remainder : 0;
+
+  if (!finalCount) {
+    return {
+      first,
+      middle: chunk(remaining, continuationPageSize),
+      final: [] as QuotationItem[]
+    };
   }
 
   const middleItems = remaining.slice(0, remaining.length - finalCount);
   const final = remaining.slice(remaining.length - finalCount);
 
-  return { first, middle: chunk(middleItems, 4), final };
+  return { first, middle: chunk(middleItems, continuationPageSize), final };
 }
 
 function headerImage(chromeImages: PdfChromeImages) {
