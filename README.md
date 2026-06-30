@@ -91,14 +91,14 @@ stored in `profiles.password_hash`; team-member hashes are stored in
 `team_members.password_hash`. Login attempts are throttled persistently in PostgreSQL.
 Sessions use signed HTTP-only cookies.
 
-6. Install Playwright Chromium for PDF generation:
+6. Install Playwright Chromium for local end-to-end testing:
 
 ```bash
 npx playwright install chromium
 ```
 
-Vercel uses the bundled `@sparticuz/chromium` serverless browser instead of the local
-Playwright browser.
+Vercel generates quotation PDFs with `@react-pdf/renderer`; no browser executable is
+required. Playwright Chromium is used only by local end-to-end tests.
 
 7. Start the app:
 

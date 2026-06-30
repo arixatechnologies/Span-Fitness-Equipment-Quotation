@@ -1,28 +1,16 @@
 import { NextResponse } from "next/server";
-import serverlessChromium from "@sparticuz/chromium";
-import { chromium } from "playwright-core";
+import { renderToBuffer } from "@react-pdf/renderer";
+import { createElement } from "react";
 import { getQuotationWithItems, logActivity } from "@/lib/data";
 import { formatCustomerName, quotationDownloadBaseName } from "@/lib/format";
 import { getPdfChromeImages } from "@/lib/pdf-assets";
-import { renderQuotationHtml } from "@/lib/pdf-template";
+import { isSafeProductImageUrl } from "@/lib/product-image-url";
+import { QuotationPdfDocument } from "@/lib/quotation-pdf-document";
 import { requireUser } from "@/lib/supabase/server";
-import type { CompanySettings, Customer } from "@/lib/types";
+import type { CompanySettings, Customer, QuotationItem } from "@/lib/types";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
-
-async function launchPdfBrowser() {
-  const isVercel = Boolean(process.env.VERCEL);
-  serverlessChromium.setGraphicsMode = false;
-
-  return chromium.launch({
-    args: isVercel ? serverlessChromium.args : [],
-    executablePath: isVercel
-      ? await serverlessChromium.executablePath()
-      : chromium.executablePath(),
-    headless: true
-  });
-}
 
 async function getStoredPdfDownload(supabase: any, id: string) {
   const { data: quotation, error } = await supabase
@@ -56,40 +44,71 @@ async function getStoredPdfDownload(supabase: any, id: string) {
   };
 }
 
+function imageMime(buffer: Buffer) {
+  if (
+    buffer.length >= 8 &&
+    buffer.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))
+  ) {
+    return "image/png";
+  }
+
+  if (buffer.length >= 3 && buffer[0] === 255 && buffer[1] === 216 && buffer[2] === 255) {
+    return "image/jpeg";
+  }
+
+  return "";
+}
+
+async function getProductImage(item: QuotationItem) {
+  if (!item.image_url || !isSafeProductImageUrl(item.image_url)) return null;
+
+  try {
+    const response = await fetch(item.image_url, {
+      signal: AbortSignal.timeout(8_000),
+      cache: "no-store"
+    });
+    if (!response.ok) return null;
+
+    const declaredSize = Number(response.headers.get("content-length") || 0);
+    if (declaredSize > 5 * 1024 * 1024) return null;
+
+    const buffer = Buffer.from(await response.arrayBuffer());
+    if (buffer.length > 5 * 1024 * 1024) return null;
+
+    const mime = imageMime(buffer);
+    return mime ? `data:${mime};base64,${buffer.toString("base64")}` : null;
+  } catch (error) {
+    console.warn(`Unable to load PDF product image for ${item.sku}`, error);
+    return null;
+  }
+}
+
+async function getProductImages(items: QuotationItem[]) {
+  const entries = await Promise.all(
+    items.map(async (item) => [item.id, await getProductImage(item)] as const)
+  );
+
+  return Object.fromEntries(entries.filter((entry): entry is [string, string] => Boolean(entry[1])));
+}
+
 async function createQuotationPdf(supabase: any, id: string) {
-  const [{ quotation, items }, chromeImages] = await Promise.all([
-    getQuotationWithItems(supabase, id),
-    getPdfChromeImages()
+  const { quotation, items } = await getQuotationWithItems(supabase, id);
+  const [chromeImages, productImages] = await Promise.all([
+    getPdfChromeImages(),
+    getProductImages(items)
   ]);
   const settings = quotation.company_settings_snapshot as CompanySettings;
   const customer = quotation.customer_snapshot as Partial<Customer>;
-  const html = renderQuotationHtml({ quotation, items, settings, chromeImages });
-
-  const browser = await launchPdfBrowser();
-  let pdf: Buffer;
-
-  try {
-    const page = await browser.newPage();
-    await page.setContent(html, { waitUntil: "networkidle" });
-    await page.waitForFunction(
-      () => document.documentElement.dataset.pdfPagination === "ready",
-      null,
-      { timeout: 10_000 }
-    );
-    pdf = await page.pdf({
-      format: "A4",
-      printBackground: true,
-      preferCSSPageSize: true,
-      margin: {
-        top: "0",
-        right: "0",
-        bottom: "0",
-        left: "0"
-      }
-    });
-  } finally {
-    await browser.close();
-  }
+  const document = createElement(QuotationPdfDocument, {
+    quotation,
+    items,
+    settings,
+    chromeImages,
+    productImages
+  });
+  const pdf = Buffer.from(
+    await renderToBuffer(document as unknown as Parameters<typeof renderToBuffer>[0])
+  );
 
   const filename = `${quotationDownloadBaseName(
     formatCustomerName(customer),
