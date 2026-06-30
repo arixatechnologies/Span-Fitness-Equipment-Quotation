@@ -183,29 +183,7 @@ function chunk<T>(items: T[], size: number) {
 
 function splitProductPages(items: QuotationItem[]) {
   const first = items.slice(0, 4);
-  const remaining = items.slice(4);
-  const continuationPageSize = 5;
-  const maxSummaryProducts = 3;
-
-  if (!remaining.length) {
-    return { first, middle: [] as QuotationItem[][], final: [] as QuotationItem[] };
-  }
-
-  const remainder = remaining.length % continuationPageSize;
-  const finalCount = remainder > 0 && remainder <= maxSummaryProducts ? remainder : 0;
-
-  if (!finalCount) {
-    return {
-      first,
-      middle: chunk(remaining, continuationPageSize),
-      final: [] as QuotationItem[]
-    };
-  }
-
-  const middleItems = remaining.slice(0, remaining.length - finalCount);
-  const final = remaining.slice(remaining.length - finalCount);
-
-  return { first, middle: chunk(middleItems, continuationPageSize), final };
+  return { first, continuation: chunk(items.slice(4), 5) };
 }
 
 function headerImage(chromeImages: PdfChromeImages) {
@@ -232,16 +210,14 @@ function gstText(quotation: Quotation) {
   return "* GST Extra.";
 }
 
-function termsBlock(quotation: Quotation) {
+function termsBlocks(quotation: Quotation) {
   return `
-    <div class="terms-block">
-      <p><strong>Terms and Conditions:</strong><br>${lines(quotation.terms)}</p>
-      <p><strong>Warranty:</strong><br>${lines(quotation.warranty_note)}</p>
-      <p><strong>Delivery:</strong><br>${lines(quotation.delivery_note)}</p>
-      <p><strong>Transportation:</strong><br>${lines(quotation.transportation_note)}</p>
-      <p><strong>GST:</strong><br>${gstText(quotation)}</p>
-      <p><strong>Payment:</strong><br>${lines(quotation.payment_terms)}</p>
-    </div>
+    <div class="terms-entry terms-first"><strong>Terms and Conditions:</strong><br>${lines(quotation.terms)}</div>
+    <div class="terms-entry"><strong>Warranty:</strong><br>${lines(quotation.warranty_note)}</div>
+    <div class="terms-entry"><strong>Delivery:</strong><br>${lines(quotation.delivery_note)}</div>
+    <div class="terms-entry"><strong>Transportation:</strong><br>${lines(quotation.transportation_note)}</div>
+    <div class="terms-entry"><strong>GST:</strong><br>${gstText(quotation)}</div>
+    <div class="terms-entry"><strong>Payment:</strong><br>${lines(quotation.payment_terms)}</div>
   `;
 }
 
@@ -295,7 +271,7 @@ function firstPage({
   chromeImages: PdfChromeImages;
 }) {
   return `
-    <section class="page page-1">
+    <section class="page page-1 product-page">
       ${headerImage(chromeImages)}
 
       <h1 class="quote-title">QUOTATION</h1>
@@ -314,7 +290,7 @@ function firstPage({
       </div>
 
       ${productTable({ items, startIndex: 0, settings })}
-      ${footerImage(chromeImages, "page1-footer")}
+      ${footerImage(chromeImages, "page-footer")}
     </section>
   `;
 }
@@ -331,66 +307,22 @@ function productOnlyPage({
   chromeImages: PdfChromeImages;
 }) {
   return `
-    <section class="page product-only-page">
+    <section class="page continuation-page product-only-page product-page">
       ${headerImage(chromeImages)}
       ${productTable({ items, startIndex, settings, className: "page2-products" })}
-      ${footerImage(chromeImages, "page2-footer")}
+      ${footerImage(chromeImages, "page-footer")}
     </section>
   `;
 }
 
-function summaryPage({
-  quotation,
-  items,
-  startIndex,
-  settings,
-  chromeImages,
-  continueDetailsOnSupportPage,
-  includeAfterSalesSupport
-}: {
-  quotation: Quotation;
-  items: QuotationItem[];
-  startIndex: number;
-  settings: CompanySettings;
-  chromeImages: PdfChromeImages;
-  continueDetailsOnSupportPage: boolean;
-  includeAfterSalesSupport: boolean;
-}) {
-  return `
-    <section class="page page-2 summary-products-${items.length}">
-      ${headerImage(chromeImages)}
-      ${
-        items.length
-          ? productTable({
-              items,
-              startIndex,
-              settings,
-              className: "page2-products",
-              showHead: false
-            })
-          : ""
-      }
-      ${totalsTable(quotation)}
-      ${continueDetailsOnSupportPage ? "" : termsBlock(quotation)}
-      ${continueDetailsOnSupportPage ? "" : bankBlock(settings)}
-      ${includeAfterSalesSupport ? afterSalesBlock(quotation) : ""}
-      ${footerImage(chromeImages, "page2-footer")}
-    </section>
-  `;
-}
-
-function supportPage({
+function detailFlow({
   quotation,
   settings,
-  chromeImages,
-  includeSummaryDetails,
-  includeAfterSalesSupport
+  chromeImages
 }: {
   quotation: Quotation;
   settings: CompanySettings;
   chromeImages: PdfChromeImages;
-  includeSummaryDetails: boolean;
-  includeAfterSalesSupport: boolean;
 }) {
   const phoneIconBig = iconMarkup(chromeImages.phoneIconBig, "phone");
   const phoneIcon = iconMarkup(chromeImages.phoneIcon, "phone");
@@ -404,21 +336,20 @@ function supportPage({
     : settings.authorized_person_designation || "National Head";
 
   return `
-    <section class="page page-3">
-      ${headerImage(chromeImages)}
+    <template id="pdf-flow-blocks">
+      ${totalsTable(quotation)}
+      ${termsBlocks(quotation)}
+      ${bankBlock(settings)}
+      ${afterSalesBlock(quotation)}
 
-      ${includeSummaryDetails ? termsBlock(quotation) : ""}
-      ${includeSummaryDetails ? bankBlock(settings) : ""}
-
-      ${includeAfterSalesSupport ? afterSalesBlock(quotation) : ""}
-
-      <div class="company-line">
-        <strong>For ${escapeHtml(settings.company_name)}</strong>
-      </div>
-
-      <div class="signature-row line-bottom">
-        <div><strong>${escapeHtml(settings.bank_branch || "Visakhapatnam")}</strong></div>
-        <div><strong>${escapeHtml(signerName)}</strong>${signerDesignation ? `<br>${escapeHtml(signerDesignation)}` : ""}</div>
+      <div class="signatory-block">
+        <div class="company-line">
+          <strong>For ${escapeHtml(settings.company_name)}</strong>
+        </div>
+        <div class="signature-row line-bottom">
+          <div><strong>${escapeHtml(settings.bank_branch || "Visakhapatnam")}</strong></div>
+          <div><strong>${escapeHtml(signerName)}</strong>${signerDesignation ? `<br>${escapeHtml(signerDesignation)}` : ""}</div>
+        </div>
       </div>
 
       <div class="office-row">
@@ -437,9 +368,75 @@ function supportPage({
           <span class="icon-text">${phoneIcon} ${escapeHtml(settings.phone_numbers.split("|")[0]?.trim() || settings.phone_numbers)}</span>
         </div>
       </div>
+    </template>
 
-      ${footerImage(chromeImages, "page3-footer")}
-    </section>
+    <template id="pdf-flow-page">
+      <section class="page continuation-page details-page">
+        ${headerImage(chromeImages)}
+        <div class="flow-area"></div>
+        ${footerImage(chromeImages, "page-footer")}
+      </section>
+    </template>
+
+    <script>
+      (() => {
+        const paginate = () => {
+        const blockTemplate = document.getElementById("pdf-flow-blocks");
+        const pageTemplate = document.getElementById("pdf-flow-page");
+        const productPages = Array.from(document.querySelectorAll(".product-page"));
+        let currentPage = productPages[productPages.length - 1];
+
+        const createArea = (page) => {
+          let area = page.querySelector(".flow-area");
+          if (!area) {
+            area = document.createElement("div");
+            area.className = "flow-area";
+            const footer = page.querySelector(".page-footer");
+            page.insertBefore(area, footer || null);
+          }
+          return area;
+        };
+
+        const createDetailsPage = () => {
+          const fragment = pageTemplate.content.cloneNode(true);
+          const page = fragment.querySelector(".details-page");
+          document.body.insertBefore(fragment, blockTemplate);
+          return page;
+        };
+
+        const blockFits = (page, block) => {
+          const pageRect = page.getBoundingClientRect();
+          const footer = page.querySelector(".page-footer");
+          const limit = footer
+            ? footer.getBoundingClientRect().top - 8
+            : pageRect.bottom - 45;
+          return block.getBoundingClientRect().bottom <= limit + 0.5;
+        };
+
+        let area = createArea(currentPage);
+        const blocks = Array.from(blockTemplate.content.children);
+
+        for (const sourceBlock of blocks) {
+          const block = sourceBlock.cloneNode(true);
+          area.appendChild(block);
+
+          if (!blockFits(currentPage, block)) {
+            area.removeChild(block);
+            currentPage = createDetailsPage();
+            area = createArea(currentPage);
+            area.appendChild(block);
+          }
+        }
+
+        blockTemplate.remove();
+        pageTemplate.remove();
+        document.documentElement.dataset.pdfPagination = "ready";
+        };
+
+        if (document.readyState === "complete") paginate();
+        else window.addEventListener("load", paginate, { once: true });
+      })();
+    </script>
   `;
 }
 
@@ -450,13 +447,10 @@ export function renderQuotationHtml({
   chromeImages = {}
 }: PdfTemplateInput) {
   const customer = customerFromSnapshot(quotation.customer_snapshot);
-  const { first, middle, final } = splitProductPages(items);
-  const continueDetailsOnSupportPage = final.length === 3;
-  const includeAfterSalesOnSummaryPage =
-    !continueDetailsOnSupportPage && final.length <= 1;
+  const { first, continuation } = splitProductPages(items);
   let nextIndex = first.length;
 
-  const middlePages = middle
+  const continuationPages = continuation
     .map((pageItems) => {
       const html = productOnlyPage({
         items: pageItems,
@@ -524,7 +518,7 @@ html, body {
   margin: 0 0 3.2mm 0;
 }
 
-.page-2 .top-banner {
+.continuation-page .top-banner {
   height: 52mm;
   object-fit: fill;
 }
@@ -633,8 +627,7 @@ html, body {
   background: #fff;
 }
 
-.page1-footer,
-.page2-footer {
+.page-footer {
   position: absolute;
   left: 11.7mm;
   right: 11.7mm;
@@ -670,20 +663,18 @@ html, body {
 .total-table td:first-child { width: 63%; }
 .total-table td:last-child { width: 37%; }
 
-.terms-block {
+.terms-entry {
   margin-left: 9mm;
-  margin-top: 2mm;
   width: 150mm;
   font-size: 8.25pt;
   line-height: 1.2;
-}
-
-.terms-block p {
-  margin: 0 0 1mm 0;
+  margin-bottom: 1mm;
   break-inside: avoid;
 }
 
-.terms-block strong {
+.terms-first { margin-top: 2mm; }
+
+.terms-entry strong {
   display: inline-block;
   margin-bottom: .35mm;
   font-size: 8.6pt;
@@ -753,15 +744,6 @@ html, body {
 
 .sep { margin: 0 1.5mm; }
 
-.page3-footer {
-  position: absolute;
-  left: 11.7mm;
-  right: 11.7mm;
-  bottom: 10mm;
-  width: calc(100% - 23.4mm);
-  height: 35.25mm;
-}
-
 @media print {
   html, body { background: #fff; }
   .page {
@@ -779,23 +761,8 @@ html, body {
 </head>
 <body>
   ${firstPage({ quotation, items: first, customer, settings, chromeImages })}
-  ${middlePages}
-  ${summaryPage({
-    quotation,
-    items: final,
-    startIndex: nextIndex,
-    settings,
-    chromeImages,
-    continueDetailsOnSupportPage,
-    includeAfterSalesSupport: includeAfterSalesOnSummaryPage
-  })}
-  ${supportPage({
-    quotation,
-    settings,
-    chromeImages,
-    includeSummaryDetails: continueDetailsOnSupportPage,
-    includeAfterSalesSupport: !includeAfterSalesOnSummaryPage
-  })}
+  ${continuationPages}
+  ${detailFlow({ quotation, settings, chromeImages })}
 </body>
 </html>`;
 }

@@ -1,8 +1,13 @@
+"use client";
+
 import Link from "next/link";
+import { useActionState } from "react";
 import { saveProductAction } from "@/app/actions/products";
+import { ActionFeedback } from "@/components/action-feedback";
 import { ProductImageInput } from "@/components/product-image-input";
 import { RequiredMark } from "@/components/required-mark";
 import { SubmitButton } from "@/components/submit-button";
+import { initialActionState } from "@/lib/action-state";
 import type { Brand, Product } from "@/lib/types";
 
 type ProductFormProps = {
@@ -11,8 +16,10 @@ type ProductFormProps = {
 };
 
 export function ProductForm({ product, brands }: ProductFormProps) {
+  const [state, formAction] = useActionState(saveProductAction, initialActionState);
+
   return (
-    <form action={saveProductAction} className="panel p-5">
+    <form action={formAction} className="panel p-5">
       <input type="hidden" name="id" value={product?.id || ""} />
       <input type="hidden" name="gst_percent" value={product?.gst_percent || 18} />
       <input type="hidden" name="status" value={product?.status || "active"} />
@@ -32,6 +39,8 @@ export function ProductForm({ product, brands }: ProductFormProps) {
       <input type="hidden" name="machine_weight" value={product?.machine_weight || ""} />
       <input type="hidden" name="stack_weight" value={product?.stack_weight || ""} />
       <input type="hidden" name="warranty_note" value={product?.warranty_note || ""} />
+
+      <ActionFeedback state={state} className="mb-4" />
 
       <div className="grid gap-4 md:grid-cols-2">
         <label>

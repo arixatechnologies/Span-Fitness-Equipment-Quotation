@@ -1,5 +1,6 @@
 import { Save, Trash2 } from "lucide-react";
-import { deleteBrandAction, saveBrandAction, toggleBrandAction } from "@/app/actions/taxonomy";
+import { deleteBrandAction, toggleBrandAction } from "@/app/actions/taxonomy";
+import { BrandActionForm } from "@/components/brand-action-form";
 import { RequiredMark } from "@/components/required-mark";
 import { SubmitButton } from "@/components/submit-button";
 import { StatusBadge } from "@/components/ui";
@@ -17,7 +18,11 @@ export default async function BrandsPage() {
         <p className="text-sm text-slate-500">Manage product brands used in product dropdowns.</p>
       </div>
 
-      <form action={saveBrandAction} className="panel grid gap-3 p-4 md:grid-cols-[1fr_auto_auto]">
+      <BrandActionForm
+        className="panel grid gap-3 p-4 md:grid-cols-[1fr_auto_auto]"
+        feedbackClassName="md:col-span-3"
+        resetOnSuccess
+      >
         <label>
           <span className="field-label">
             New Brand
@@ -43,7 +48,7 @@ export default async function BrandsPage() {
             Add Brand
           </SubmitButton>
         </div>
-      </form>
+      </BrandActionForm>
 
       <section className="panel overflow-hidden">
         <div className="grid gap-3 p-3 md:hidden">
@@ -57,7 +62,7 @@ export default async function BrandsPage() {
                 <StatusBadge status={brand.is_active ? "active" : "inactive"} />
               </div>
 
-              <form action={saveBrandAction} className="mt-3 grid gap-2">
+              <BrandActionForm className="mt-3 grid gap-2">
                 <input type="hidden" name="id" value={brand.id} />
                 <label>
                   <span className="field-label">
@@ -87,7 +92,7 @@ export default async function BrandsPage() {
                   <Save className="h-4 w-4" />
                   Save
                 </SubmitButton>
-              </form>
+              </BrandActionForm>
 
               <div className="mt-3 grid grid-cols-2 gap-2">
                 <form action={toggleBrandAction}>
@@ -136,7 +141,10 @@ export default async function BrandsPage() {
               {(brands || []).map((brand: any) => (
                 <tr key={brand.id}>
                   <td className="table-cell">
-                    <form action={saveBrandAction} className="flex items-center gap-2">
+                    <BrandActionForm
+                      className="flex flex-wrap items-center gap-2"
+                      feedbackClassName="basis-full"
+                    >
                       <input type="hidden" name="id" value={brand.id} />
                       <input
                         className="field-input max-w-xs"
@@ -165,7 +173,7 @@ export default async function BrandsPage() {
                       >
                         <Save className="h-4 w-4" />
                       </SubmitButton>
-                    </form>
+                    </BrandActionForm>
                   </td>
                   <td className="table-cell">{brand.slug}</td>
                   <td className="table-cell">

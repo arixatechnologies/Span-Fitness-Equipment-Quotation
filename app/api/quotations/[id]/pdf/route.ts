@@ -44,6 +44,11 @@ async function createQuotationPdf(supabase: any, id: string) {
   try {
     const page = await browser.newPage();
     await page.setContent(html, { waitUntil: "networkidle" });
+    await page.waitForFunction(
+      () => document.documentElement.dataset.pdfPagination === "ready",
+      null,
+      { timeout: 10_000 }
+    );
     pdf = await page.pdf({
       format: "A4",
       printBackground: true,

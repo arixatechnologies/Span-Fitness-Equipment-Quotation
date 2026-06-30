@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
+import { databaseErrorMessage, type ActionState } from "@/lib/action-state";
 import { slugify } from "@/lib/format";
 import { logActivity } from "@/lib/data";
 import { isSafeProductImageUrl } from "@/lib/product-image-url";
@@ -93,18 +94,20 @@ function cleanNullable(value: FormDataEntryValue | null) {
   return text ? text : null;
 }
 
-export async function saveProductAction(formData: FormData) {
+export async function saveProductAction(
+  _previousState: ActionState,
+  formData: FormData
+): Promise<ActionState> {
   const { supabase, user } = await requireUser();
   const imageFile = formData.get("image") as File | null;
-  const imageUrl = await uploadImage(supabase, imageFile, cleanNullable(formData.get("image_url")));
-  const parsed = productSchema.parse({
+  const parsedResult = productSchema.safeParse({
     id: String(formData.get("id") || ""),
     sku: String(formData.get("sku") || "").trim(),
     product_name: String(formData.get("product_name") || "").trim(),
     brand_id: cleanNullable(formData.get("brand_id")),
     category_id: cleanNullable(formData.get("category_id")),
     sub_category_id: cleanNullable(formData.get("sub_category_id")),
-    image_url: imageUrl,
+    image_url: cleanNullable(formData.get("image_url")),
     unit_price: formData.get("unit_price"),
     special_price: formData.get("unit_price"),
     gst_percent: formData.get("gst_percent") || 18,
@@ -118,13 +121,62 @@ export async function saveProductAction(formData: FormData) {
     status: String(formData.get("status") || "active")
   });
 
+  if (!parsedResult.success) {
+    const issue = parsedResult.error.issues[0];
+    const field = String(issue?.path[0] || "");
+    const messages: Record<string, string> = {
+      sku: "Enter a Product ID.",
+      product_name: "Enter a product name.",
+      image_url: "Enter a valid public HTTPS image link.",
+      unit_price: "Enter a valid Unit Price."
+    };
+
+    return {
+      status: "error",
+      message: messages[field] || issue?.message || "Check the product details and try again."
+    };
+  }
+
+  const parsed = parsedResult.data;
+  let duplicateQuery = supabase.from("products").select("id").eq("sku", parsed.sku);
+  if (parsed.id) duplicateQuery = duplicateQuery.neq("id", parsed.id);
+  const { data: duplicate, error: duplicateError } = await duplicateQuery.maybeSingle();
+
+  if (duplicateError) {
+    console.error("Unable to check Product ID uniqueness", duplicateError);
+    return {
+      status: "error",
+      message: "Unable to validate the Product ID right now. Please try again."
+    };
+  }
+
+  if (duplicate) {
+    return {
+      status: "error",
+      message: `Product ID "${parsed.sku}" already exists. Enter a different Product ID.`
+    };
+  }
+
+  let imageUrl: string | null;
+  try {
+    imageUrl = await uploadImage(supabase, imageFile, parsed.image_url || null);
+  } catch (error) {
+    console.error("Unable to upload product image", error);
+    const message = error instanceof Error ? error.message : "";
+    const safeMessage =
+      message.startsWith("Image must") || message.startsWith("Unsupported product image")
+        ? message
+        : "Unable to upload the product image. Please try again.";
+    return { status: "error", message: safeMessage };
+  }
+
   const payload = {
     sku: parsed.sku,
     product_name: parsed.product_name,
     brand_id: parsed.brand_id || null,
     category_id: parsed.category_id || null,
     sub_category_id: parsed.sub_category_id || null,
-    image_url: parsed.image_url || null,
+    image_url: imageUrl,
     unit_price: parsed.unit_price,
     special_price: parsed.unit_price,
     gst_percent: parsed.gst_percent,
@@ -140,7 +192,19 @@ export async function saveProductAction(formData: FormData) {
 
   if (parsed.id) {
     const { error } = await supabase.from("products").update(payload).eq("id", parsed.id);
-    if (error) throw new Error(error.message);
+    if (error) {
+      console.error("Unable to update product", error);
+      return {
+        status: "error",
+        message: databaseErrorMessage(
+          error,
+          {
+            products_sku_key: `Product ID "${parsed.sku}" already exists. Enter a different Product ID.`
+          },
+          "Unable to update the product. Please try again."
+        )
+      };
+    }
     await logActivity(supabase, {
       userId: user.id,
       action: "Product edited",
@@ -149,7 +213,19 @@ export async function saveProductAction(formData: FormData) {
     });
   } else {
     const { data, error } = await supabase.from("products").insert(payload).select("id").single();
-    if (error) throw new Error(error.message);
+    if (error) {
+      console.error("Unable to add product", error);
+      return {
+        status: "error",
+        message: databaseErrorMessage(
+          error,
+          {
+            products_sku_key: `Product ID "${parsed.sku}" already exists. Enter a different Product ID.`
+          },
+          "Unable to add the product. Please try again."
+        )
+      };
+    }
     await logActivity(supabase, {
       userId: user.id,
       action: "Product added",
