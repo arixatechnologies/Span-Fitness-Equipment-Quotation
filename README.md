@@ -58,7 +58,6 @@ SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 NEXT_PUBLIC_SITE_URL=http://localhost:3000
 ADMIN_EMAIL=admin@spanfitness.com
 AUTH_SECRET=replace-with-a-long-random-secret
-CHROMIUM_PACK_URL=https://github.com/Sparticuz/chromium/releases/download/v149.0.0/chromium-v149.0.0-pack.x64.tar
 ```
 
 4. Apply Supabase migrations in order:
@@ -98,8 +97,8 @@ Sessions use signed HTTP-only cookies.
 npx playwright install chromium
 ```
 
-Vercel uses `@sparticuz/chromium-min` and the configured Chromium pack URL instead of
-the local Playwright browser.
+Vercel uses the bundled `@sparticuz/chromium` serverless browser instead of the local
+Playwright browser.
 
 7. Start the app:
 

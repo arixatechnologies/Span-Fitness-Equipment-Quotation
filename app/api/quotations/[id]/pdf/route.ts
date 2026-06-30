@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import serverlessChromium from "@sparticuz/chromium-min";
+import serverlessChromium from "@sparticuz/chromium";
 import { chromium } from "playwright-core";
 import { getQuotationWithItems, logActivity } from "@/lib/data";
 import { formatCustomerName, quotationDownloadBaseName } from "@/lib/format";
@@ -11,9 +11,6 @@ import type { CompanySettings, Customer } from "@/lib/types";
 export const runtime = "nodejs";
 export const maxDuration = 120;
 
-const DEFAULT_CHROMIUM_PACK_URL =
-  "https://github.com/Sparticuz/chromium/releases/download/v149.0.0/chromium-v149.0.0-pack.x64.tar";
-
 async function launchPdfBrowser() {
   const isVercel = Boolean(process.env.VERCEL);
   serverlessChromium.setGraphicsMode = false;
@@ -21,12 +18,42 @@ async function launchPdfBrowser() {
   return chromium.launch({
     args: isVercel ? serverlessChromium.args : [],
     executablePath: isVercel
-      ? await serverlessChromium.executablePath(
-          process.env.CHROMIUM_PACK_URL || DEFAULT_CHROMIUM_PACK_URL
-        )
+      ? await serverlessChromium.executablePath()
       : chromium.executablePath(),
     headless: true
   });
+}
+
+async function getStoredPdfDownload(supabase: any, id: string) {
+  const { data: quotation, error } = await supabase
+    .from("quotations")
+    .select("id, quote_number, customer_snapshot, pdf_path")
+    .eq("id", id)
+    .single();
+
+  if (error) throw new Error(error.message);
+  if (!quotation.pdf_path) return null;
+
+  const customer = quotation.customer_snapshot as Partial<Customer>;
+  const filename = `${quotationDownloadBaseName(
+    formatCustomerName(customer),
+    quotation.quote_number
+  )}.pdf`;
+  const { data, error: signedUrlError } = await supabase.storage
+    .from("quotation-pdfs")
+    .createSignedUrl(quotation.pdf_path, 60 * 10, { download: filename });
+
+  if (signedUrlError || !data?.signedUrl) {
+    console.error("Stored quotation PDF signing failed", signedUrlError);
+    return null;
+  }
+
+  return {
+    quotation,
+    path: quotation.pdf_path,
+    downloadUrl: data.signedUrl,
+    filename
+  };
 }
 
 async function createQuotationPdf(supabase: any, id: string) {
@@ -135,6 +162,27 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
   try {
     const { supabase, user } = await requireUser();
+
+    if (isDownload) {
+      const storedPdf = await getStoredPdfDownload(supabase, id);
+
+      if (storedPdf) {
+        await logActivity(supabase, {
+          userId: user.id,
+          action: "Quotation PDF downloaded",
+          entityType: "quotation",
+          entityId: storedPdf.quotation.id
+        });
+
+        return NextResponse.json({
+          url: storedPdf.downloadUrl,
+          downloadUrl: storedPdf.downloadUrl,
+          path: storedPdf.path,
+          filename: storedPdf.filename
+        });
+      }
+    }
+
     const { quotation, path, shareUrl, downloadUrl, filename } =
       await storeQuotationPdf(supabase, id);
 
