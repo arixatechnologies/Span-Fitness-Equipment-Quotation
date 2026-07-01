@@ -310,6 +310,13 @@ async function run() {
     await singleRow.waitFor({ state: "detached" });
     pass("single-product delete confirmation");
 
+    assert.equal(
+      await page.locator('tr input[type="checkbox"]').count(),
+      0,
+      "Product selection checkboxes were visible before Select mode"
+    );
+    await page.getByRole("button", { name: "Select", exact: true }).click();
+
     for (const name of [`${prefix} Bulk Product A`, `${prefix} Bulk Product B`]) {
       const row = page.locator("tr").filter({ hasText: name });
       await row.getByLabel(`Select ${name}`).check();
@@ -362,11 +369,16 @@ async function run() {
     );
     assert.ok(quotationId, "Quotation ID was not present after creation");
     cleanupState.quotationIds.add(quotationId);
-    await page
-      .frameLocator("iframe")
-      .getByText(`${prefix} Customer`, { exact: false })
-      .waitFor();
-    pass("quotation creation and HTML preview");
+    const previewFrame = page.locator('iframe[title^="Preview"]');
+    await previewFrame.waitFor();
+    const previewSrc = await previewFrame.getAttribute("src");
+    assert.match(previewSrc || "", /^\/api\/quotations\/[0-9a-f-]{36}\/pdf/);
+    const previewResponse = await page.request.get(new URL(previewSrc, baseUrl).toString(), {
+      timeout: 120_000
+    });
+    assert.equal(previewResponse.status(), 200);
+    assert.equal((await previewResponse.body()).subarray(0, 5).toString("ascii"), "%PDF-");
+    pass("quotation creation and native PDF preview");
 
     const excelResponsePromise = page.waitForResponse(
       (response) =>

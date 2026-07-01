@@ -12,38 +12,6 @@ import type { CompanySettings, Customer, QuotationItem } from "@/lib/types";
 export const runtime = "nodejs";
 export const maxDuration = 120;
 
-async function getStoredPdfDownload(supabase: any, id: string) {
-  const { data: quotation, error } = await supabase
-    .from("quotations")
-    .select("id, quote_number, customer_snapshot, pdf_path")
-    .eq("id", id)
-    .single();
-
-  if (error) throw new Error(error.message);
-  if (!quotation.pdf_path) return null;
-
-  const customer = quotation.customer_snapshot as Partial<Customer>;
-  const filename = `${quotationDownloadBaseName(
-    formatCustomerName(customer),
-    quotation.quote_number
-  )}.pdf`;
-  const { data, error: signedUrlError } = await supabase.storage
-    .from("quotation-pdfs")
-    .createSignedUrl(quotation.pdf_path, 60 * 10, { download: filename });
-
-  if (signedUrlError || !data?.signedUrl) {
-    console.error("Stored quotation PDF signing failed", signedUrlError);
-    return null;
-  }
-
-  return {
-    quotation,
-    path: quotation.pdf_path,
-    downloadUrl: data.signedUrl,
-    filename
-  };
-}
-
 function imageMime(buffer: Buffer) {
   if (
     buffer.length >= 8 &&
@@ -118,7 +86,12 @@ async function createQuotationPdf(supabase: any, id: string) {
   return { quotation, pdf, filename };
 }
 
-async function storeQuotationPdf(supabase: any, id: string) {
+async function storeQuotationPdf(
+  supabase: any,
+  id: string,
+  options: { markSent?: boolean; recordFile?: boolean } = {}
+) {
+  const { markSent = true, recordFile = true } = options;
   const { quotation, pdf, filename } = await createQuotationPdf(supabase, id);
   const path = `quotations/${quotation.id}/${filename}`;
 
@@ -150,17 +123,23 @@ async function storeQuotationPdf(supabase: any, id: string) {
   const expiresAt = new Date(Date.now() + expiresIn * 1000).toISOString();
   const { error: updateError } = await supabase
     .from("quotations")
-    .update({ pdf_url: shareResult.data.signedUrl, pdf_path: path, status: "Sent" })
+    .update({
+      pdf_url: shareResult.data.signedUrl,
+      pdf_path: path,
+      ...(markSent ? { status: "Sent" } : {})
+    })
     .eq("id", quotation.id);
 
   if (updateError) throw new Error(updateError.message);
 
-  await supabase.from("pdf_files").insert({
-    quotation_id: quotation.id,
-    storage_path: path,
-    signed_url: shareResult.data.signedUrl,
-    expires_at: expiresAt
-  });
+  if (recordFile) {
+    await supabase.from("pdf_files").insert({
+      quotation_id: quotation.id,
+      storage_path: path,
+      signed_url: shareResult.data.signedUrl,
+      expires_at: expiresAt
+    });
+  }
 
   if (quotation.pdf_path && quotation.pdf_path !== path) {
     await supabase.storage.from("quotation-pdfs").remove([quotation.pdf_path]);
@@ -175,33 +154,29 @@ async function storeQuotationPdf(supabase: any, id: string) {
   };
 }
 
+export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+
+  try {
+    const { supabase } = await requireUser();
+    const { shareUrl } = await storeQuotationPdf(supabase, id, {
+      markSent: false,
+      recordFile: false
+    });
+
+    return NextResponse.redirect(shareUrl);
+  } catch (error) {
+    console.error("Quotation PDF preview failed", error);
+    return NextResponse.json({ error: "Unable to preview PDF" }, { status: 500 });
+  }
+}
+
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const isDownload = new URL(request.url).searchParams.get("download") === "1";
 
   try {
     const { supabase, user } = await requireUser();
-
-    if (isDownload) {
-      const storedPdf = await getStoredPdfDownload(supabase, id);
-
-      if (storedPdf) {
-        await logActivity(supabase, {
-          userId: user.id,
-          action: "Quotation PDF downloaded",
-          entityType: "quotation",
-          entityId: storedPdf.quotation.id
-        });
-
-        return NextResponse.json({
-          url: storedPdf.downloadUrl,
-          downloadUrl: storedPdf.downloadUrl,
-          path: storedPdf.path,
-          filename: storedPdf.filename
-        });
-      }
-    }
-
     const { quotation, path, shareUrl, downloadUrl, filename } =
       await storeQuotationPdf(supabase, id);
 

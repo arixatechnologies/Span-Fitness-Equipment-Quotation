@@ -17,6 +17,7 @@ type DeleteRequest =
   | { kind: "bulk"; ids: string[] };
 
 export function ProductsList({ products }: { products: Product[] }) {
+  const [selectionMode, setSelectionMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [deleteRequest, setDeleteRequest] = useState<DeleteRequest | null>(null);
   const allSelected = products.length > 0 && selectedIds.size === products.length;
@@ -31,7 +32,12 @@ export function ProductsList({ products }: { products: Product[] }) {
   }
 
   function toggleAll() {
-    setSelectedIds(allSelected ? new Set() : new Set(products.map((product) => product.id)));
+    setSelectedIds(new Set(products.map((product) => product.id)));
+  }
+
+  function cancelSelection() {
+    setSelectedIds(new Set());
+    setSelectionMode(false);
   }
 
   function requestBulkDelete() {
@@ -52,6 +58,7 @@ export function ProductsList({ products }: { products: Product[] }) {
     } else {
       await bulkSoftDeleteProductsAction(formData);
       setSelectedIds(new Set());
+      setSelectionMode(false);
     }
 
     setDeleteRequest(null);
@@ -63,32 +70,50 @@ export function ProductsList({ products }: { products: Product[] }) {
     <>
       <section className="panel overflow-hidden">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line bg-white px-4 py-3">
-          <label className="inline-flex cursor-pointer items-center gap-2 text-sm font-semibold text-slate-700">
-            <input
-              type="checkbox"
-              checked={allSelected}
-              onChange={toggleAll}
-              className="h-4 w-4 rounded border-line accent-[#93B5C6]"
-              aria-label="Select all products"
-            />
-            Select all
-          </label>
-          <div className="flex flex-wrap items-center justify-end gap-3">
-            <span className="text-sm text-slate-500">
-              {selectedIds.size
-                ? `${selectedIds.size} product${selectedIds.size === 1 ? "" : "s"} selected`
-                : "No products selected"}
-            </span>
+          {selectionMode ? (
+            <>
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  onClick={toggleAll}
+                  disabled={allSelected}
+                >
+                  <Check className="h-4 w-4" aria-hidden="true" />
+                  Select All
+                </button>
+                <button type="button" className="btn-muted" onClick={cancelSelection}>
+                  <X className="h-4 w-4" aria-hidden="true" />
+                  Cancel
+                </button>
+              </div>
+              <div className="flex flex-wrap items-center justify-end gap-3">
+                <span className="text-sm text-slate-500">
+                  {selectedIds.size
+                    ? `${selectedIds.size} product${selectedIds.size === 1 ? "" : "s"} selected`
+                    : "Select products to delete"}
+                </span>
+                <button
+                  type="button"
+                  className="btn-danger min-w-[148px]"
+                  disabled={!selectedIds.size}
+                  onClick={requestBulkDelete}
+                >
+                  <Trash2 className="h-4 w-4" aria-hidden="true" />
+                  Delete Selected
+                </button>
+              </div>
+            </>
+          ) : (
             <button
               type="button"
-              className="btn-danger min-w-[148px]"
-              disabled={!selectedIds.size}
-              onClick={requestBulkDelete}
+              className="btn-secondary"
+              onClick={() => setSelectionMode(true)}
             >
-              <Trash2 className="h-4 w-4" aria-hidden="true" />
-              Delete Selected
+              <Check className="h-4 w-4" aria-hidden="true" />
+              Select
             </button>
-          </div>
+          )}
         </div>
 
         <div className="grid gap-3 p-3 md:hidden">
@@ -102,24 +127,26 @@ export function ProductsList({ products }: { products: Product[] }) {
                   isSelected ? "border-mist ring-2 ring-mist/30" : "border-line"
                 }`}
               >
-                <div className="mb-3 flex items-center justify-between gap-3">
-                  <label className="inline-flex cursor-pointer items-center gap-2 text-sm font-semibold text-slate-600">
-                    <input
-                      type="checkbox"
-                      checked={isSelected}
-                      onChange={() => toggleProduct(product.id)}
-                      className="h-4 w-4 rounded border-line accent-[#93B5C6]"
-                      aria-label={`Select ${product.product_name}`}
-                    />
-                    Select
-                  </label>
-                  {isSelected ? (
-                    <span className="inline-flex items-center gap-1 text-xs font-bold text-slate-600">
-                      <Check className="h-3.5 w-3.5" aria-hidden="true" />
-                      Selected
-                    </span>
-                  ) : null}
-                </div>
+                {selectionMode ? (
+                  <div className="mb-3 flex items-center justify-between gap-3">
+                    <label className="inline-flex cursor-pointer items-center gap-2 text-sm font-semibold text-slate-600">
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={() => toggleProduct(product.id)}
+                        className="h-4 w-4 rounded border-line accent-[#93B5C6]"
+                        aria-label={`Select ${product.product_name}`}
+                      />
+                      Select
+                    </label>
+                    {isSelected ? (
+                      <span className="inline-flex items-center gap-1 text-xs font-bold text-slate-600">
+                        <Check className="h-3.5 w-3.5" aria-hidden="true" />
+                        Selected
+                      </span>
+                    ) : null}
+                  </div>
+                ) : null}
                 <div className="flex gap-3">
                   <ProductImage
                     src={product.image_url}
@@ -169,15 +196,7 @@ export function ProductsList({ products }: { products: Product[] }) {
           <table className="w-full min-w-[860px]">
             <thead className="table-head">
               <tr>
-                <th className="w-14 px-4 py-3 text-center">
-                  <input
-                    type="checkbox"
-                    checked={allSelected}
-                    onChange={toggleAll}
-                    className="h-4 w-4 rounded border-line accent-[#93B5C6]"
-                    aria-label="Select all products in table"
-                  />
-                </th>
+                {selectionMode ? <th className="w-14 px-4 py-3 text-center">Select</th> : null}
                 <th className="px-4 py-3">Product</th>
                 <th className="px-4 py-3">Brand</th>
                 <th className="px-4 py-3 text-right">Unit Price</th>
@@ -190,15 +209,17 @@ export function ProductsList({ products }: { products: Product[] }) {
 
                 return (
                   <tr key={product.id} className={isSelected ? "bg-blush/60" : undefined}>
-                    <td className="table-cell text-center">
-                      <input
-                        type="checkbox"
-                        checked={isSelected}
-                        onChange={() => toggleProduct(product.id)}
-                        className="h-4 w-4 rounded border-line accent-[#93B5C6]"
-                        aria-label={`Select ${product.product_name}`}
-                      />
-                    </td>
+                    {selectionMode ? (
+                      <td className="table-cell text-center">
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() => toggleProduct(product.id)}
+                          className="h-4 w-4 rounded border-line accent-[#93B5C6]"
+                          aria-label={`Select ${product.product_name}`}
+                        />
+                      </td>
+                    ) : null}
                     <td className="table-cell">
                       <div className="flex items-center gap-3">
                         <ProductImage
