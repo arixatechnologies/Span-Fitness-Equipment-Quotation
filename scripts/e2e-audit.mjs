@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { pbkdf2Sync, randomBytes } from "node:crypto";
+import { readFile } from "node:fs/promises";
 import { createClient } from "@supabase/supabase-js";
 import { chromium } from "playwright-core";
 
@@ -369,16 +370,11 @@ async function run() {
     );
     assert.ok(quotationId, "Quotation ID was not present after creation");
     cleanupState.quotationIds.add(quotationId);
-    const previewFrame = page.locator('iframe[title^="Preview"]');
-    await previewFrame.waitFor();
-    const previewSrc = await previewFrame.getAttribute("src");
-    assert.match(previewSrc || "", /^\/api\/quotations\/[0-9a-f-]{36}\/pdf/);
-    const previewResponse = await page.request.get(new URL(previewSrc, baseUrl).toString(), {
-      timeout: 120_000
-    });
-    assert.equal(previewResponse.status(), 200);
-    assert.equal((await previewResponse.body()).subarray(0, 5).toString("ascii"), "%PDF-");
-    pass("quotation creation and native PDF preview");
+    await page
+      .frameLocator("iframe")
+      .getByText(`${prefix} Customer`, { exact: false })
+      .waitFor();
+    pass("quotation creation and HTML preview");
 
     const excelResponsePromise = page.waitForResponse(
       (response) =>
@@ -395,21 +391,13 @@ async function run() {
     assert.equal((await excelFile.body()).subarray(0, 2).toString(), "PK");
     pass("Excel generation, storage, and signed download");
 
-    const pdfResponsePromise = page.waitForResponse(
-      (response) =>
-        response.url().includes(`/api/quotations/${quotationId}/pdf`) &&
-        response.request().method() === "POST" &&
-        response.url().includes("download=1"),
-      { timeout: 120_000 }
-    );
+    const pdfDownloadPromise = page.waitForEvent("download", { timeout: 120_000 });
     await page.getByRole("button", { name: "Download PDF" }).click();
-    const pdfResponse = await pdfResponsePromise;
-    assert.equal(pdfResponse.status(), 200, await pdfResponse.text());
-    const pdfResult = await pdfResponse.json();
-    const pdfFile = await context.request.get(pdfResult.url);
-    assert.equal(pdfFile.status(), 200);
-    assert.equal((await pdfFile.body()).subarray(0, 4).toString(), "%PDF");
-    pass("PDF generation, storage, and signed download");
+    const pdfDownload = await pdfDownloadPromise;
+    const pdfPath = await pdfDownload.path();
+    assert.ok(pdfPath, "Browser PDF download did not create a local file");
+    assert.equal((await readFile(pdfPath)).subarray(0, 4).toString(), "%PDF");
+    pass("preview-matched browser PDF download");
 
     await page.goto(`${baseUrl}/quotations`);
     const visibleQuoteNumber = await page

@@ -73,8 +73,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 26,
     marginBottom: 6
   },
-  customerColumn: { width: "56%", lineHeight: 1.12 },
-  quoteColumn: { width: "44%", textAlign: "right", lineHeight: 1.15, paddingTop: 4 },
+  customerColumn: { width: "56%", lineHeight: 1.2 },
+  quoteColumn: { width: "44%", textAlign: "right", lineHeight: 1.25, paddingTop: 4 },
   toLabel: { fontFamily: "Times-Bold", fontSize: 10, marginBottom: 12 },
   bold: { fontFamily: "Times-Bold" },
   table: { width: CONTENT_WIDTH },
@@ -441,12 +441,13 @@ function FirstPageIntro({ quotation }: { quotation: Quotation }) {
       <View style={styles.customerRow} wrap={false}>
         <View style={styles.customerColumn}>
           <Text style={styles.toLabel}>To:</Text>
-          <Text>{`${formatCustomerName(customer)},\n${customer.phone || ""},\n${
-            customerFullAddress(customer) || "."
-          }`}</Text>
+          <Text>{formatCustomerName(customer)},</Text>
+          <Text>{customer.phone || ""},</Text>
+          <Text>{customerFullAddress(customer) || "."}</Text>
         </View>
         <View style={styles.quoteColumn}>
-          <Text style={styles.bold}>{`DATE: ${formatDate(quotation.quote_date)}\nQUOTATION NO: ${quotation.quote_number}`}</Text>
+          <Text style={styles.bold}>DATE: {formatDate(quotation.quote_date)}</Text>
+          <Text style={styles.bold}>QUOTATION NO: {quotation.quote_number}</Text>
         </View>
       </View>
     </>

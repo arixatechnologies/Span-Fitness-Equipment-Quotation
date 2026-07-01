@@ -16,6 +16,7 @@ export function QuotationActions({
   quotationId,
   editHref,
   initialPdfUrl,
+  previewFrameId,
   customerName,
   quoteNumber,
   grandTotal
@@ -23,6 +24,7 @@ export function QuotationActions({
   quotationId: string;
   editHref: string;
   initialPdfUrl?: string | null;
+  previewFrameId?: string;
   customerName: string;
   quoteNumber: string;
   grandTotal: number;
@@ -32,6 +34,95 @@ export function QuotationActions({
     "" | "generate" | "download" | "excel"
   >("");
   const loading = Boolean(pendingAction);
+
+  async function downloadPreviewPdf() {
+    const frame = document.getElementById(previewFrameId || "") as HTMLIFrameElement | null;
+    const previewDocument = frame?.contentDocument;
+
+    if (!previewDocument?.body) {
+      throw new Error("Quotation preview is not ready. Please try again.");
+    }
+
+    const readyDeadline = Date.now() + 10_000;
+    while (
+      previewDocument.documentElement.dataset.pdfPagination !== "ready" &&
+      Date.now() < readyDeadline
+    ) {
+      await new Promise((resolve) => window.setTimeout(resolve, 100));
+    }
+
+    await previewDocument.fonts?.ready;
+    await Promise.all(
+      Array.from(previewDocument.images).map(async (image) => {
+        if (image.complete) return;
+        await image.decode().catch(() => undefined);
+      })
+    );
+
+    const exportRoot = document.createElement("div");
+    exportRoot.style.position = "absolute";
+    exportRoot.style.left = "0";
+    exportRoot.style.top = "0";
+    exportRoot.style.zIndex = "2147483647";
+    exportRoot.style.width = "210mm";
+    exportRoot.style.background = "#ffffff";
+
+    const injectedStyles: HTMLStyleElement[] = [];
+    for (const sourceStyle of Array.from(previewDocument.head.querySelectorAll("style"))) {
+      const style = document.createElement("style");
+      style.textContent = sourceStyle.textContent;
+      document.head.appendChild(style);
+      injectedStyles.push(style);
+    }
+
+    const exportOverrides = document.createElement("style");
+    exportOverrides.textContent = `
+      .page { margin: 0 !important; box-shadow: none !important; }
+    `;
+    document.head.appendChild(exportOverrides);
+    injectedStyles.push(exportOverrides);
+
+    for (const page of Array.from(previewDocument.body.querySelectorAll<HTMLElement>(".page"))) {
+      exportRoot.appendChild(document.importNode(page, true));
+    }
+
+    document.body.appendChild(exportRoot);
+
+    try {
+      const [{ default: html2canvas }, { jsPDF }] = await Promise.all([
+        import("html2canvas"),
+        import("jspdf")
+      ]);
+      const pages = Array.from(exportRoot.querySelectorAll<HTMLElement>(".page"));
+      const pdf = new jsPDF({
+        unit: "mm",
+        format: "a4",
+        orientation: "portrait",
+        compress: true
+      });
+
+      for (const [index, page] of pages.entries()) {
+        const canvas = await html2canvas(page, {
+            scale: 2,
+            useCORS: true,
+            allowTaint: false,
+            backgroundColor: "#ffffff",
+            logging: false,
+          windowWidth: page.scrollWidth,
+          width: page.scrollWidth,
+          height: page.scrollHeight
+        });
+
+        if (index > 0) pdf.addPage("a4", "portrait");
+        pdf.addImage(canvas.toDataURL("image/jpeg", 0.98), "JPEG", 0, 0, 210, 297);
+      }
+
+      pdf.save(`${quotationDownloadBaseName(customerName, quoteNumber)}.pdf`);
+    } finally {
+      exportRoot.remove();
+      for (const style of injectedStyles) style.remove();
+    }
+  }
 
   async function generatePdf() {
     setPendingAction("generate");
@@ -61,6 +152,11 @@ export function QuotationActions({
     setPendingAction("download");
 
     try {
+      if (previewFrameId) {
+        await downloadPreviewPdf();
+        return;
+      }
+
       const response = await fetch(`/api/quotations/${quotationId}/pdf?download=1`, {
         method: "POST"
       });
@@ -78,8 +174,8 @@ export function QuotationActions({
       document.body.appendChild(anchor);
       anchor.click();
       anchor.remove();
-    } catch {
-      alert("Unable to download PDF");
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "Unable to download PDF");
     } finally {
       setPendingAction("");
     }
