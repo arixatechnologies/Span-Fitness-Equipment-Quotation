@@ -138,7 +138,10 @@ export async function saveProductAction(
   }
 
   const parsed = parsedResult.data;
-  let duplicateQuery = supabase.from("products").select("id").eq("sku", parsed.sku);
+  let duplicateQuery = supabase
+    .from("products")
+    .select("id, deleted_at")
+    .eq("sku", parsed.sku);
   if (parsed.id) duplicateQuery = duplicateQuery.neq("id", parsed.id);
   const { data: duplicate, error: duplicateError } = await duplicateQuery.maybeSingle();
 
@@ -150,7 +153,9 @@ export async function saveProductAction(
     };
   }
 
-  if (duplicate) {
+  const deletedProductId = !parsed.id && duplicate?.deleted_at ? duplicate.id : null;
+
+  if (duplicate && !deletedProductId) {
     return {
       status: "error",
       message: `Product ID "${parsed.sku}" already exists. Enter a different Product ID.`
@@ -210,6 +215,35 @@ export async function saveProductAction(
       action: "Product edited",
       entityType: "product",
       entityId: parsed.id
+    });
+  } else if (deletedProductId) {
+    const { error } = await supabase
+      .from("products")
+      .update({ ...payload, deleted_at: null })
+      .eq("id", deletedProductId)
+      .not("deleted_at", "is", null)
+      .select("id")
+      .single();
+
+    if (error) {
+      console.error("Unable to restore product", error);
+      return {
+        status: "error",
+        message: databaseErrorMessage(
+          error,
+          {
+            products_sku_key: `Product ID "${parsed.sku}" already exists. Enter a different Product ID.`
+          },
+          "Unable to restore the deleted product. Please try again."
+        )
+      };
+    }
+
+    await logActivity(supabase, {
+      userId: user.id,
+      action: "Product restored",
+      entityType: "product",
+      entityId: deletedProductId
     });
   } else {
     const { data, error } = await supabase.from("products").insert(payload).select("id").single();
@@ -326,17 +360,27 @@ export async function bulkImportProducts(rows: unknown[]) {
 
   const { data: existing, error: existingError } = await supabase
     .from("products")
-    .select("sku")
+    .select("id, sku, deleted_at")
     .in("sku", skus);
 
   if (existingError) throw new Error(existingError.message);
 
-  if (existing?.length) {
+  const activeProducts = (existing || []).filter(
+    (item: { deleted_at: string | null }) => !item.deleted_at
+  );
+
+  if (activeProducts.length) {
     return {
       ok: false,
-      message: `These SKUs already exist: ${existing.map((item: { sku: string }) => item.sku).join(", ")}`
+      message: `These Product IDs already exist: ${activeProducts
+        .map((item: { sku: string }) => item.sku)
+        .join(", ")}`
     };
   }
+
+  const deletedProductSkus = new Set(
+    (existing || []).map((item: { sku: string }) => item.sku)
+  );
 
   const productPayload = [];
 
@@ -355,20 +399,34 @@ export async function bulkImportProducts(rows: unknown[]) {
       stock_availability: row.stock_availability,
       description: row.description || null,
       technical_specifications: null,
-      status: row.status
+      dimensions: null,
+      machine_weight: null,
+      stack_weight: null,
+      warranty_note: null,
+      status: row.status,
+      deleted_at: null
     });
   }
 
-  const { error } = await supabase.from("products").insert(productPayload);
+  const restoredCount = productPayload.filter((product) =>
+    deletedProductSkus.has(product.sku)
+  ).length;
+  const { error } = await supabase
+    .from("products")
+    .upsert(productPayload, { onConflict: "sku" });
   if (error) throw new Error(error.message);
 
   await logActivity(supabase, {
     userId: user.id,
     action: "Products imported",
     entityType: "product",
-    metadata: { count: productPayload.length }
+    metadata: { count: productPayload.length, restoredCount }
   });
 
   revalidatePath("/products");
-  return { ok: true, message: `${productPayload.length} products imported successfully.` };
+  const restoredMessage = restoredCount ? ` ${restoredCount} deleted products were restored.` : "";
+  return {
+    ok: true,
+    message: `${productPayload.length} products imported successfully.${restoredMessage}`
+  };
 }

@@ -54,74 +54,68 @@ export function QuotationActions({
     await previewDocument.fonts?.ready;
     await Promise.all(
       Array.from(previewDocument.images).map(async (image) => {
-        if (image.complete) return;
+        if (!image.complete) {
+          await new Promise<void>((resolve) => {
+            const finish = () => resolve();
+            image.addEventListener("load", finish, { once: true });
+            image.addEventListener("error", finish, { once: true });
+            window.setTimeout(finish, 10_000);
+          });
+        }
         await image.decode().catch(() => undefined);
       })
     );
 
-    const exportRoot = document.createElement("div");
-    exportRoot.style.position = "absolute";
-    exportRoot.style.left = "0";
-    exportRoot.style.top = "0";
-    exportRoot.style.zIndex = "2147483647";
-    exportRoot.style.width = "210mm";
-    exportRoot.style.background = "#ffffff";
-
-    const injectedStyles: HTMLStyleElement[] = [];
-    for (const sourceStyle of Array.from(previewDocument.head.querySelectorAll("style"))) {
-      const style = document.createElement("style");
-      style.textContent = sourceStyle.textContent;
-      document.head.appendChild(style);
-      injectedStyles.push(style);
-    }
-
-    const exportOverrides = document.createElement("style");
-    exportOverrides.textContent = `
-      .page { margin: 0 !important; box-shadow: none !important; }
-    `;
-    document.head.appendChild(exportOverrides);
-    injectedStyles.push(exportOverrides);
-
-    for (const page of Array.from(previewDocument.body.querySelectorAll<HTMLElement>(".page"))) {
-      exportRoot.appendChild(document.importNode(page, true));
-    }
-
-    document.body.appendChild(exportRoot);
-
-    try {
-      const [{ default: html2canvas }, { jsPDF }] = await Promise.all([
-        import("html2canvas"),
-        import("jspdf")
-      ]);
-      const pages = Array.from(exportRoot.querySelectorAll<HTMLElement>(".page"));
-      const pdf = new jsPDF({
-        unit: "mm",
-        format: "a4",
-        orientation: "portrait",
-        compress: true
-      });
-
-      for (const [index, page] of pages.entries()) {
-        const canvas = await html2canvas(page, {
-            scale: 2,
-            useCORS: true,
-            allowTaint: false,
-            backgroundColor: "#ffffff",
-            logging: false,
-          windowWidth: page.scrollWidth,
-          width: page.scrollWidth,
-          height: page.scrollHeight
-        });
-
-        if (index > 0) pdf.addPage("a4", "portrait");
-        pdf.addImage(canvas.toDataURL("image/jpeg", 0.98), "JPEG", 0, 0, 210, 297);
+    await new Promise<void>((resolve) => {
+      const previewWindow = previewDocument.defaultView;
+      if (!previewWindow) {
+        resolve();
+        return;
       }
 
-      pdf.save(`${quotationDownloadBaseName(customerName, quoteNumber)}.pdf`);
-    } finally {
-      exportRoot.remove();
-      for (const style of injectedStyles) style.remove();
+      previewWindow.requestAnimationFrame(() =>
+        previewWindow.requestAnimationFrame(() => resolve())
+      );
+    });
+
+    const [{ default: html2canvas }, { jsPDF }] = await Promise.all([
+      import("html2canvas"),
+      import("jspdf")
+    ]);
+    const pages = Array.from(previewDocument.body.querySelectorAll<HTMLElement>(".page"));
+
+    if (!pages.length) {
+      throw new Error("Quotation preview pages are not ready. Please try again.");
     }
+
+    const pdf = new jsPDF({
+      unit: "mm",
+      format: "a4",
+      orientation: "portrait",
+      compress: true
+    });
+
+    for (const [index, page] of pages.entries()) {
+      const pageRect = page.getBoundingClientRect();
+      const canvas = await html2canvas(page, {
+        scale: 2,
+        useCORS: true,
+        allowTaint: false,
+        backgroundColor: "#ffffff",
+        logging: false,
+        windowWidth: previewDocument.documentElement.scrollWidth,
+        windowHeight: previewDocument.documentElement.scrollHeight,
+        width: pageRect.width,
+        height: pageRect.height,
+        scrollX: 0,
+        scrollY: 0
+      });
+
+      if (index > 0) pdf.addPage("a4", "portrait");
+      pdf.addImage(canvas.toDataURL("image/jpeg", 0.98), "JPEG", 0, 0, 210, 297);
+    }
+
+    pdf.save(`${quotationDownloadBaseName(customerName, quoteNumber)}.pdf`);
   }
 
   async function generatePdf() {

@@ -10,6 +10,7 @@ import ExcelJS, {
   type Image as ExcelJsImage,
   type Worksheet
 } from "exceljs";
+import sharp from "sharp";
 import { formatCustomerName } from "@/lib/format";
 import { isSafeProductImageUrl } from "@/lib/product-image-url";
 import type {
@@ -204,6 +205,29 @@ function imageExtension(buffer: Buffer): WorkbookImage["extension"] | null {
   return null;
 }
 
+function isWebpImage(buffer: Buffer) {
+  return (
+    buffer.length >= 12 &&
+    buffer.subarray(0, 4).toString("ascii") === "RIFF" &&
+    buffer.subarray(8, 12).toString("ascii") === "WEBP"
+  );
+}
+
+async function prepareWorkbookImage(buffer: Buffer): Promise<WorkbookImage | null> {
+  const extension = imageExtension(buffer);
+  if (extension) return { buffer, extension };
+  if (!isWebpImage(buffer)) return null;
+
+  const jpeg = await sharp(buffer)
+    .rotate()
+    .resize(600, 600, { fit: "inside", withoutEnlargement: true })
+    .flatten({ background: "#ffffff" })
+    .jpeg({ quality: 90 })
+    .toBuffer();
+
+  return jpeg.length <= MAX_IMAGE_BYTES ? { buffer: jpeg, extension: "jpeg" } : null;
+}
+
 async function fetchPublicImage(url: URL, redirectCount = 0): Promise<Response | null> {
   if (!isSafeProductImageUrl(url.toString()) || redirectCount > 3) return null;
 
@@ -233,14 +257,13 @@ async function fetchPublicImage(url: URL, redirectCount = 0): Promise<Response |
 async function loadProductImage(imageUrl: string): Promise<WorkbookImage | null> {
   try {
     const dataImage = imageUrl.match(
-      /^data:image\/(png|jpe?g|gif);base64,([a-z0-9+/=\s]+)$/i
+      /^data:image\/(png|jpe?g|gif|webp);base64,([a-z0-9+/=\s]+)$/i
     );
 
     if (dataImage) {
       const buffer = Buffer.from(dataImage[2].replace(/\s/g, ""), "base64");
       if (buffer.length > MAX_IMAGE_BYTES) return null;
-      const extension = imageExtension(buffer);
-      return extension ? { buffer, extension } : null;
+      return await prepareWorkbookImage(buffer);
     }
 
     const url = new URL(imageUrl);
@@ -253,8 +276,7 @@ async function loadProductImage(imageUrl: string): Promise<WorkbookImage | null>
     const buffer = Buffer.from(await response.arrayBuffer());
     if (!buffer.length || buffer.length > MAX_IMAGE_BYTES) return null;
 
-    const extension = imageExtension(buffer);
-    return extension ? { buffer, extension } : null;
+    return await prepareWorkbookImage(buffer);
   } catch {
     return null;
   }

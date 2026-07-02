@@ -68,8 +68,15 @@ function productBrand(item: QuotationItem, settings: CompanySettings) {
   return brand || "SPAN";
 }
 
+function isPreviewImagePath(value: string) {
+  return /^\/api\/quotations\/[0-9a-f-]+\/preview-image\/[0-9a-f-]+$/i.test(value);
+}
+
 function productImage(item: QuotationItem) {
-  if (!item.image_url || !isSafeProductImageUrl(item.image_url)) {
+  if (
+    !item.image_url ||
+    (!isSafeProductImageUrl(item.image_url) && !isPreviewImagePath(item.image_url))
+  ) {
     return `<div class="product-fallback">SFE</div>`;
   }
 

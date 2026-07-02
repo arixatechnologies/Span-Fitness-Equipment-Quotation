@@ -3,6 +3,7 @@ import { getQuotationWithItems } from "@/lib/data";
 import { formatCustomerName } from "@/lib/format";
 import { getPdfChromeImages } from "@/lib/pdf-assets";
 import { renderQuotationHtml } from "@/lib/pdf-template";
+import { isSafeProductImageUrl } from "@/lib/product-image-url";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import type { CompanySettings, Customer } from "@/lib/types";
 
@@ -15,7 +16,14 @@ export default async function QuotationPreviewPage({ params }: { params: Promise
   ]);
   const settings = quotation.company_settings_snapshot as CompanySettings;
   const customer = quotation.customer_snapshot as Partial<Customer>;
-  const html = renderQuotationHtml({ quotation, items, settings, chromeImages });
+  const previewItems = items.map((item) => ({
+    ...item,
+    image_url:
+      item.image_url && isSafeProductImageUrl(item.image_url)
+        ? `/api/quotations/${quotation.id}/preview-image/${item.id}`
+        : null
+  }));
+  const html = renderQuotationHtml({ quotation, items: previewItems, settings, chromeImages });
 
   return (
     <div className="grid gap-5">

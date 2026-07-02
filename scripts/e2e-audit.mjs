@@ -3,6 +3,8 @@ import { pbkdf2Sync, randomBytes } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { createClient } from "@supabase/supabase-js";
 import { chromium } from "playwright-core";
+import ExcelJS from "exceljs";
+import sharp from "sharp";
 
 process.loadEnvFile?.(".env");
 
@@ -31,6 +33,7 @@ const supabase = createClient(
 const cleanupState = {
   memberIds: new Set(),
   productIds: new Set(),
+  productImagePaths: new Set(),
   customerIds: new Set(),
   quotationIds: new Set()
 };
@@ -116,6 +119,25 @@ async function createProduct(page, sku, name) {
     .single();
   if (error) throw error;
   cleanupState.productIds.add(data.id);
+
+  const webpImage = await sharp(
+    await readFile(new URL("../public/login%20image/span-logo-s.png", import.meta.url))
+  )
+    .webp({ quality: 90 })
+    .toBuffer();
+  const imagePath = `e2e/${sku}.webp`;
+  const { error: imageUploadError } = await supabase.storage
+    .from("product-images")
+    .upload(imagePath, webpImage, { contentType: "image/webp", upsert: true });
+  if (imageUploadError) throw imageUploadError;
+  cleanupState.productImagePaths.add(imagePath);
+  const { data: publicImage } = supabase.storage.from("product-images").getPublicUrl(imagePath);
+  const { error: imageUpdateError } = await supabase
+    .from("products")
+    .update({ image_url: publicImage.publicUrl })
+    .eq("id", data.id);
+  if (imageUpdateError) throw imageUpdateError;
+
   return data.id;
 }
 
@@ -236,6 +258,10 @@ async function cleanup() {
 
   const productIds = Array.from(cleanupState.productIds);
   if (productIds.length) await supabase.from("products").delete().in("id", productIds);
+  const productImagePaths = Array.from(cleanupState.productImagePaths);
+  if (productImagePaths.length) {
+    await supabase.storage.from("product-images").remove(productImagePaths);
+  }
 
   const memberIds = Array.from(cleanupState.memberIds);
   if (memberIds.length) {
@@ -374,6 +400,19 @@ async function run() {
       .frameLocator("iframe")
       .getByText(`${prefix} Customer`, { exact: false })
       .waitFor();
+    const previewProductImage = page
+      .frameLocator("iframe")
+      .locator(`img[alt="${quoteProductName}"]`);
+    await previewProductImage.waitFor();
+    assert.match(
+      await previewProductImage.getAttribute("src"),
+      new RegExp(`/api/quotations/${quotationId}/preview-image/`)
+    );
+    assert.equal(
+      await previewProductImage.evaluate((image) => image.complete && image.naturalWidth > 0),
+      true,
+      "Quotation preview product image did not load through the PDF-safe image endpoint"
+    );
     pass("quotation creation and HTML preview");
 
     const excelResponsePromise = page.waitForResponse(
@@ -388,7 +427,14 @@ async function run() {
     const excelResult = await excelResponse.json();
     const excelFile = await context.request.get(excelResult.url);
     assert.equal(excelFile.status(), 200);
-    assert.equal((await excelFile.body()).subarray(0, 2).toString(), "PK");
+    const excelBuffer = await excelFile.body();
+    assert.equal(excelBuffer.subarray(0, 2).toString(), "PK");
+    const excelWorkbook = new ExcelJS.Workbook();
+    await excelWorkbook.xlsx.load(excelBuffer);
+    assert.ok(
+      excelWorkbook.getWorksheet("Quotation")?.getImages().length >= 3,
+      "Excel quotation did not embed the WebP product image"
+    );
     pass("Excel generation, storage, and signed download");
 
     const pdfDownloadPromise = page.waitForEvent("download", { timeout: 120_000 });
