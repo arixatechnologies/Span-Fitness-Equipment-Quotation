@@ -409,7 +409,10 @@ async function run() {
       new RegExp(`/api/quotations/${quotationId}/preview-image/`)
     );
     assert.equal(
-      await previewProductImage.evaluate((image) => image.complete && image.naturalWidth > 0),
+      await previewProductImage.evaluate(async (image) => {
+        await image.decode().catch(() => undefined);
+        return image.complete && image.naturalWidth > 0;
+      }),
       true,
       "Quotation preview product image did not load through the PDF-safe image endpoint"
     );
@@ -444,6 +447,16 @@ async function run() {
     assert.ok(pdfPath, "Browser PDF download did not create a local file");
     assert.equal((await readFile(pdfPath)).subarray(0, 4).toString(), "%PDF");
     pass("preview-matched browser PDF download");
+
+    await page.goto(`${baseUrl}/quotations/${quotationId}`);
+    const redirectedPdfPromise = page.waitForEvent("download", { timeout: 120_000 });
+    await page.getByRole("button", { name: "Download PDF" }).click();
+    const redirectedPdf = await redirectedPdfPromise;
+    const redirectedPdfPath = await redirectedPdf.path();
+    assert.ok(redirectedPdfPath, "Detail-page PDF download did not create a local file");
+    assert.equal((await readFile(redirectedPdfPath)).subarray(0, 4).toString(), "%PDF");
+    assert.match(page.url(), new RegExp(`/quotations/${quotationId}/preview$`));
+    pass("all PDF downloads use the approved quotation preview template");
 
     await page.goto(`${baseUrl}/quotations`);
     const visibleQuoteNumber = await page
