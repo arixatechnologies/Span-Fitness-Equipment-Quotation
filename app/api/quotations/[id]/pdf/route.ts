@@ -1,13 +1,13 @@
 import { NextResponse } from "next/server";
-import { renderToBuffer } from "@react-pdf/renderer";
-import { createElement } from "react";
+import chromium from "@sparticuz/chromium";
+import { existsSync } from "node:fs";
+import puppeteer from "puppeteer-core";
 import { getQuotationWithItems, logActivity } from "@/lib/data";
 import { formatCustomerName, quotationDownloadBaseName } from "@/lib/format";
 import { getPdfChromeImages } from "@/lib/pdf-assets";
-import { isSafeProductImageUrl } from "@/lib/product-image-url";
-import { QuotationPdfDocument } from "@/lib/quotation-pdf-document";
+import { renderQuotationHtml } from "@/lib/pdf-template";
 import { requireUser } from "@/lib/supabase/server";
-import type { CompanySettings, Customer, QuotationItem } from "@/lib/types";
+import type { CompanySettings, Customer } from "@/lib/types";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
@@ -44,71 +44,82 @@ async function getStoredPdfDownload(supabase: any, id: string) {
   };
 }
 
-function imageMime(buffer: Buffer) {
-  if (
-    buffer.length >= 8 &&
-    buffer.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))
-  ) {
-    return "image/png";
+async function executablePath() {
+  if (process.env.PUPPETEER_EXECUTABLE_PATH) return process.env.PUPPETEER_EXECUTABLE_PATH;
+
+  if (process.platform === "win32") {
+    const candidates = [
+      "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
+      "C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe",
+      "C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe",
+      "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe"
+    ];
+    const installedBrowser = candidates.find((candidate) => existsSync(candidate));
+
+    if (installedBrowser) return installedBrowser;
   }
 
-  if (buffer.length >= 3 && buffer[0] === 255 && buffer[1] === 216 && buffer[2] === 255) {
-    return "image/jpeg";
-  }
-
-  return "";
+  return chromium.executablePath();
 }
 
-async function getProductImage(item: QuotationItem) {
-  if (!item.image_url || !isSafeProductImageUrl(item.image_url)) return null;
+async function htmlToPdf(html: string) {
+  const browser = await puppeteer.launch({
+    args: chromium.args,
+    defaultViewport: { width: 794, height: 1123, deviceScaleFactor: 1 },
+    executablePath: await executablePath(),
+    headless: true
+  });
 
   try {
-    const response = await fetch(item.image_url, {
-      signal: AbortSignal.timeout(8_000),
-      cache: "no-store"
+    const page = await browser.newPage();
+
+    await page.setContent(html, { waitUntil: "load", timeout: 60_000 });
+    await page.waitForFunction(
+      () => document.documentElement.dataset.pdfPagination === "ready",
+      { timeout: 30_000 }
+    );
+    await page.evaluate(async () => {
+      await document.fonts?.ready;
+      await Promise.all(
+        Array.from(document.images).map(async (image) => {
+          if (!image.complete) {
+            await new Promise<void>((resolve) => {
+              image.addEventListener("load", () => resolve(), { once: true });
+              image.addEventListener("error", () => resolve(), { once: true });
+              window.setTimeout(resolve, 10_000);
+            });
+          }
+
+          await image.decode().catch(() => undefined);
+        })
+      );
     });
-    if (!response.ok) return null;
 
-    const declaredSize = Number(response.headers.get("content-length") || 0);
-    if (declaredSize > 5 * 1024 * 1024) return null;
-
-    const buffer = Buffer.from(await response.arrayBuffer());
-    if (buffer.length > 5 * 1024 * 1024) return null;
-
-    const mime = imageMime(buffer);
-    return mime ? `data:${mime};base64,${buffer.toString("base64")}` : null;
-  } catch (error) {
-    console.warn(`Unable to load PDF product image for ${item.sku}`, error);
-    return null;
+    return Buffer.from(
+      await page.pdf({
+        format: "A4",
+        printBackground: true,
+        preferCSSPageSize: true,
+        margin: { top: 0, right: 0, bottom: 0, left: 0 }
+      })
+    );
+  } finally {
+    await browser.close();
   }
-}
-
-async function getProductImages(items: QuotationItem[]) {
-  const entries = await Promise.all(
-    items.map(async (item) => [item.id, await getProductImage(item)] as const)
-  );
-
-  return Object.fromEntries(entries.filter((entry): entry is [string, string] => Boolean(entry[1])));
 }
 
 async function createQuotationPdf(supabase: any, id: string) {
   const { quotation, items } = await getQuotationWithItems(supabase, id);
-  const [chromeImages, productImages] = await Promise.all([
-    getPdfChromeImages(),
-    getProductImages(items)
-  ]);
+  const chromeImages = await getPdfChromeImages();
   const settings = quotation.company_settings_snapshot as CompanySettings;
   const customer = quotation.customer_snapshot as Partial<Customer>;
-  const document = createElement(QuotationPdfDocument, {
+  const html = renderQuotationHtml({
     quotation,
     items,
     settings,
-    chromeImages,
-    productImages
+    chromeImages
   });
-  const pdf = Buffer.from(
-    await renderToBuffer(document as unknown as Parameters<typeof renderToBuffer>[0])
-  );
+  const pdf = await htmlToPdf(html);
 
   const filename = `${quotationDownloadBaseName(
     formatCustomerName(customer),

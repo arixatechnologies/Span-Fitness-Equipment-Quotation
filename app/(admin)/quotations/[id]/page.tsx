@@ -95,6 +95,7 @@ export default async function QuotationDetailPage({ params }: { params: Promise<
             editHref={`/quotations/${quotation.id}/edit`}
             initialPdfUrl={quotation.pdf_url}
             customerName={formatCustomerName(customer)}
+            customerPhone={customer.phone}
             quoteNumber={quotation.quote_number}
             grandTotal={Number(quotation.grand_total)}
           />

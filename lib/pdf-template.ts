@@ -8,7 +8,10 @@ type PdfTemplateInput = {
   items: QuotationItem[];
   settings: CompanySettings;
   chromeImages?: PdfChromeImages;
+  documentVariant?: PdfDocumentVariant;
 };
+
+type PdfDocumentVariant = "quotation" | "proforma";
 
 function escapeHtml(value: unknown) {
   return String(value ?? "")
@@ -97,7 +100,20 @@ function productDescription(item: QuotationItem) {
   return `<strong>${escapeHtml(item.product_name)}</strong>${detail ? `<br><br>${detail}` : ""}`;
 }
 
-function tableColumns() {
+function tableColumns(documentVariant: PdfDocumentVariant) {
+  if (documentVariant === "proforma") {
+    return `
+    <colgroup>
+      <col class="c-no" />
+      <col class="c-proforma-product" />
+      <col class="c-unit" />
+      <col class="c-special" />
+      <col class="c-qty" />
+      <col class="c-total" />
+    </colgroup>
+  `;
+  }
+
   return `
     <colgroup>
       <col class="c-no" />
@@ -111,7 +127,22 @@ function tableColumns() {
   `;
 }
 
-function tableHead() {
+function tableHead(documentVariant: PdfDocumentVariant) {
+  if (documentVariant === "proforma") {
+    return `
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Description</th>
+        <th>Unit Price<br>(&#8377;)</th>
+        <th>Special<br>Price (&#8377;)</th>
+        <th>Qty</th>
+        <th>Total<br>(&#8377;)</th>
+      </tr>
+    </thead>
+  `;
+  }
+
   return `
     <thead>
       <tr>
@@ -127,18 +158,34 @@ function tableHead() {
   `;
 }
 
-function productRows(items: QuotationItem[], startIndex: number, settings: CompanySettings) {
+function productRows(
+  items: QuotationItem[],
+  startIndex: number,
+  settings: CompanySettings,
+  documentVariant: PdfDocumentVariant
+) {
   if (!items.length) {
     return `
       <tr class="p-row">
-        <td class="center top" colspan="7">No products selected.</td>
+        <td class="center top" colspan="${documentVariant === "proforma" ? 6 : 7}">No products selected.</td>
       </tr>
     `;
   }
 
   return items
-    .map(
-      (item, index) => `
+    .map((item, index) =>
+      documentVariant === "proforma"
+        ? `
+      <tr class="p-row">
+        <td class="center top">${startIndex + index + 1}</td>
+        <td class="desc proforma-product-desc">${productDescription(item)}</td>
+        <td class="center top">${amount(item.unit_price)}</td>
+        <td class="center top">${amount(item.special_price)}</td>
+        <td class="center top">${amount(item.qty)}</td>
+        <td class="center top">${amount(item.line_total)}</td>
+      </tr>
+    `
+        : `
       <tr class="p-row">
         <td class="center top">${startIndex + index + 1}</td>
         <td>
@@ -163,19 +210,21 @@ function productTable({
   startIndex,
   settings,
   className = "",
-  showHead = true
+  showHead = true,
+  documentVariant = "quotation"
 }: {
   items: QuotationItem[];
   startIndex: number;
   settings: CompanySettings;
   className?: string;
   showHead?: boolean;
+  documentVariant?: PdfDocumentVariant;
 }) {
   return `
-    <table class="product-table ${className}">
-      ${tableColumns()}
-      ${showHead ? tableHead() : ""}
-      <tbody>${productRows(items, startIndex, settings)}</tbody>
+    <table class="product-table ${documentVariant === "proforma" ? "proforma-table" : ""} ${className}">
+      ${tableColumns(documentVariant)}
+      ${showHead ? tableHead(documentVariant) : ""}
+      <tbody>${productRows(items, startIndex, settings, documentVariant)}</tbody>
     </table>
   `;
 }
@@ -269,19 +318,23 @@ function firstPage({
   items,
   customer,
   settings,
-  chromeImages
+  chromeImages,
+  documentVariant
 }: {
   quotation: Quotation;
   items: QuotationItem[];
   customer: Partial<Customer>;
   settings: CompanySettings;
   chromeImages: PdfChromeImages;
+  documentVariant: PdfDocumentVariant;
 }) {
+  const isProforma = documentVariant === "proforma";
+
   return `
     <section class="page page-1 product-page">
       ${headerImage(chromeImages)}
 
-      <h1 class="quote-title">QUOTATION</h1>
+      <h1 class="quote-title">${isProforma ? "PROFORMA INVOICE" : "QUOTATION"}</h1>
 
       <div class="customer-block">
         <div class="customer-left">
@@ -292,11 +345,13 @@ function firstPage({
         </div>
         <div class="customer-right">
           <div><strong>DATE: ${formatDate(quotation.quote_date)}</strong></div>
-          <div><strong>QUOTATION NO: ${escapeHtml(quotation.quote_number)}</strong></div>
+          <div><strong>${isProforma ? "PROFORMA INVOICE NO" : "QUOTATION NO"}: ${escapeHtml(
+            quotation.quote_number
+          )}</strong></div>
         </div>
       </div>
 
-      ${productTable({ items, startIndex: 0, settings })}
+      ${productTable({ items, startIndex: 0, settings, documentVariant })}
       ${footerImage(chromeImages, "page-footer")}
     </section>
   `;
@@ -306,17 +361,19 @@ function productOnlyPage({
   items,
   startIndex,
   settings,
-  chromeImages
+  chromeImages,
+  documentVariant
 }: {
   items: QuotationItem[];
   startIndex: number;
   settings: CompanySettings;
   chromeImages: PdfChromeImages;
+  documentVariant: PdfDocumentVariant;
 }) {
   return `
     <section class="page continuation-page product-only-page product-page">
       ${headerImage(chromeImages)}
-      ${productTable({ items, startIndex, settings, className: "page2-products" })}
+      ${productTable({ items, startIndex, settings, className: "page2-products", documentVariant })}
       ${footerImage(chromeImages, "page-footer")}
     </section>
   `;
@@ -451,7 +508,8 @@ export function renderQuotationHtml({
   quotation,
   items,
   settings,
-  chromeImages = {}
+  chromeImages = {},
+  documentVariant = "quotation"
 }: PdfTemplateInput) {
   const customer = customerFromSnapshot(quotation.customer_snapshot);
   const { first, continuation } = splitProductPages(items);
@@ -463,7 +521,8 @@ export function renderQuotationHtml({
         items: pageItems,
         startIndex: nextIndex,
         settings,
-        chromeImages
+        chromeImages,
+        documentVariant
       });
       nextIndex += pageItems.length;
       return html;
@@ -475,7 +534,11 @@ export function renderQuotationHtml({
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>${escapeHtml(quotation.quote_number)}</title>
+  <title>${escapeHtml(
+    documentVariant === "proforma"
+      ? `Proforma Invoice ${quotation.quote_number}`
+      : quotation.quote_number
+  )}</title>
   <style>
 @font-face {
   font-family: "Quotation Numbers";
@@ -584,10 +647,16 @@ html, body {
 .c-no { width: 4.6%; }
 .c-product { width: 19.7%; }
 .c-desc { width: 39.7%; }
+.c-proforma-product { width: 59.4%; }
 .c-unit { width: 9%; }
 .c-special { width: 9.2%; }
 .c-qty { width: 4.8%; }
 .c-total { width: 13%; }
+
+.proforma-product-desc {
+  padding-left: 2.2mm;
+  padding-right: 2.2mm;
+}
 
 .product-card {
   width: 28.7mm;
@@ -766,8 +835,8 @@ html, body {
 }
   </style>
 </head>
-<body>
-  ${firstPage({ quotation, items: first, customer, settings, chromeImages })}
+<body class="${documentVariant === "proforma" ? "proforma-invoice" : "quotation-document"}">
+  ${firstPage({ quotation, items: first, customer, settings, chromeImages, documentVariant })}
   ${continuationPages}
   ${detailFlow({ quotation, settings, chromeImages })}
 </body>

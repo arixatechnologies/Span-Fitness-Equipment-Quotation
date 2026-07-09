@@ -397,11 +397,11 @@ async function run() {
     assert.ok(quotationId, "Quotation ID was not present after creation");
     cleanupState.quotationIds.add(quotationId);
     await page
-      .frameLocator("iframe")
+      .frameLocator("#quotation-pdf-preview")
       .getByText(`${prefix} Customer`, { exact: false })
       .waitFor();
     const previewProductImage = page
-      .frameLocator("iframe")
+      .frameLocator("#quotation-pdf-preview")
       .locator(`img[alt="${quoteProductName}"]`);
     await previewProductImage.waitFor();
     assert.match(
@@ -440,22 +440,53 @@ async function run() {
     );
     pass("Excel generation, storage, and signed download");
 
-    const pdfDownloadPromise = page.waitForEvent("download", { timeout: 120_000 });
+    const generatedPdfResponsePromise = page.waitForResponse(
+      (response) =>
+        response.url().includes(`/api/quotations/${quotationId}/pdf`) &&
+        response.request().method() === "POST",
+      { timeout: 120_000 }
+    );
+    await page.getByRole("button", { name: "Generate PDF" }).click();
+    const generatedPdfResponse = await generatedPdfResponsePromise;
+    assert.equal(generatedPdfResponse.status(), 200);
+    const generatedPdfResult = await generatedPdfResponse.json();
+    const generatedPdfFile = await context.request.get(generatedPdfResult.url);
+    assert.equal(generatedPdfFile.status(), 200);
+    assert.equal((await generatedPdfFile.body()).subarray(0, 4).toString(), "%PDF");
+    pass("preview-template PDF generation and signed link");
+
+    await page.evaluate(() => {
+      window.__quotationPrintCount = 0;
+      const frame = document.querySelector("#quotation-pdf-preview");
+      if (frame?.contentWindow) {
+        frame.contentWindow.print = () => {
+          window.__quotationPrintCount += 1;
+        };
+      }
+    });
     await page.getByRole("button", { name: "Download PDF" }).click();
-    const pdfDownload = await pdfDownloadPromise;
-    const pdfPath = await pdfDownload.path();
-    assert.ok(pdfPath, "Browser PDF download did not create a local file");
-    assert.equal((await readFile(pdfPath)).subarray(0, 4).toString(), "%PDF");
-    pass("preview-matched browser PDF download");
+    await page.waitForFunction(() => window.__quotationPrintCount === 1);
+    pass("preview-matched browser PDF print flow");
+
+    await page.evaluate(() => {
+      window.__quotationPrintCount = 0;
+      const frame = document.querySelector("#quotation-proforma-preview");
+      if (frame?.contentWindow) {
+        frame.contentWindow.print = () => {
+          window.__quotationPrintCount += 1;
+        };
+      }
+    });
+    await page.getByRole("button", { name: "Download Proforma Invoice" }).click();
+    await page.waitForFunction(() => window.__quotationPrintCount === 1);
+    pass("preview-matched browser proforma invoice print flow");
 
     await page.goto(`${baseUrl}/quotations/${quotationId}`);
-    const redirectedPdfPromise = page.waitForEvent("download", { timeout: 120_000 });
     await page.getByRole("button", { name: "Download PDF" }).click();
-    const redirectedPdf = await redirectedPdfPromise;
-    const redirectedPdfPath = await redirectedPdf.path();
-    assert.ok(redirectedPdfPath, "Detail-page PDF download did not create a local file");
-    assert.equal((await readFile(redirectedPdfPath)).subarray(0, 4).toString(), "%PDF");
-    assert.match(page.url(), new RegExp(`/quotations/${quotationId}/preview$`));
+    await page.waitForURL(new RegExp(`/quotations/${quotationId}/preview`), {
+      timeout: 30_000
+    });
+    assert.equal(new URL(page.url()).pathname, `/quotations/${quotationId}/preview`);
     pass("all PDF downloads use the approved quotation preview template");
 
     await page.goto(`${baseUrl}/quotations`);

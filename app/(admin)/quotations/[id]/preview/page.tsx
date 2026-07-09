@@ -111,6 +111,15 @@ export default async function QuotationPreviewPage({
     settings,
     chromeImages
   });
+  const proformaHtml = renderQuotationHtml({
+    quotation,
+    items: previewItems,
+    settings,
+    chromeImages,
+    documentVariant: "proforma"
+  });
+  const autoDownloadMode =
+    download === "proforma" ? "proforma" : download === "1" ? "pdf" : false;
 
   return (
     <div className="grid gap-5">
@@ -128,8 +137,10 @@ export default async function QuotationPreviewPage({
             editHref={`/quotations/${quotation.id}/edit`}
             initialPdfUrl={quotation.pdf_url}
             previewFrameId="quotation-pdf-preview"
-            autoDownload={download === "1"}
+            proformaFrameId="quotation-proforma-preview"
+            autoDownloadMode={autoDownloadMode}
             customerName={formatCustomerName(customer)}
+            customerPhone={customer.phone}
             quoteNumber={quotation.quote_number}
             grandTotal={Number(quotation.grand_total)}
           />
@@ -150,6 +161,23 @@ export default async function QuotationPreviewPage({
           title={`Preview ${quotation.quote_number}`}
           srcDoc={html}
           className="h-[65vh] min-h-[420px] w-full rounded-md border border-line bg-white sm:min-h-[560px] lg:h-[calc(100vh-220px)] lg:min-h-[720px]"
+        />
+        <iframe
+          id="quotation-proforma-preview"
+          title={`Proforma Invoice ${quotation.quote_number}`}
+          srcDoc={proformaHtml}
+          aria-hidden="true"
+          tabIndex={-1}
+          style={{
+            position: "fixed",
+            left: "-10000px",
+            top: 0,
+            width: "210mm",
+            height: "297mm",
+            border: 0,
+            opacity: 0,
+            pointerEvents: "none"
+          }}
         />
       </div>
     </div>
