@@ -100,9 +100,8 @@ function customerAddress(customer: Partial<Customer>) {
     .join(", ");
 }
 
-function productBrand(item: QuotationItem, settings: CompanySettings) {
+function productBrand(item: QuotationItem) {
   const brand = text(item.brand_name);
-  if (/welcare/i.test(brand)) return settings.company_name;
   return brand || "SPAN";
 }
 
@@ -397,7 +396,7 @@ function addProductRows(
     const itemRow = worksheet.getRow(row);
     itemRow.height = 92;
     const description = productDescription(item);
-    const brand = productBrand(item, settings);
+    const brand = productBrand(item);
     const image = productImages.get(text(item.image_url)) || null;
 
     itemRow.getCell(1).value = index + 1;

@@ -215,9 +215,9 @@ function customerFullAddress(customer: Partial<Customer>) {
     .join(", ");
 }
 
-function productBrand(item: QuotationItem, settings: CompanySettings) {
+function productBrand(item: QuotationItem) {
   const brand = String(item.brand_name || "").trim();
-  return /welcare/i.test(brand) ? settings.company_name : brand || "SPAN";
+  return brand || "SPAN";
 }
 
 function productDetails(item: QuotationItem) {
@@ -296,7 +296,7 @@ function ProductTable({
                 ) : (
                   <View style={styles.productFallback}><Text>SFE</Text></View>
                 )}
-                <Text style={styles.productBrand}>{productBrand(item, settings)}</Text>
+                <Text style={styles.productBrand}>{productBrand(item)}</Text>
               </View>
             </View>
             <View style={cellStyle(2)}>

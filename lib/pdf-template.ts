@@ -65,9 +65,8 @@ function labelLine(label: string, value: unknown) {
   return text ? `${escapeHtml(label)} : ${escapeHtml(text)}<br>` : "";
 }
 
-function productBrand(item: QuotationItem, settings: CompanySettings) {
+function productBrand(item: QuotationItem) {
   const brand = String(item.brand_name || "").trim();
-  if (/welcare/i.test(brand)) return settings.company_name;
   return brand || "SPAN";
 }
 
@@ -191,7 +190,7 @@ function productRows(
         <td>
           <div class="product-card">
             ${productImage(item)}
-            <strong>${escapeHtml(productBrand(item, settings))}</strong>
+            <strong>${escapeHtml(productBrand(item))}</strong>
           </div>
         </td>
         <td class="desc">${productDescription(item)}</td>
