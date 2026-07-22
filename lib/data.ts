@@ -2,9 +2,12 @@ import { DEFAULT_COMPANY_SETTINGS } from "@/lib/constants";
 import type {
   BrandFooterLogo,
   CompanySettings,
+  Product,
   Quotation,
   QuotationItem
 } from "@/lib/types";
+
+const PRODUCT_PAGE_SIZE = 1000;
 
 export async function getCompanySettings(supabase: any): Promise<CompanySettings> {
   const { data, error } = await supabase
@@ -46,6 +49,35 @@ export async function getFooterLogos(supabase: any): Promise<BrandFooterLogo[]> 
   }
 
   return (data || []) as BrandFooterLogo[];
+}
+
+export async function getActiveQuotationProducts(supabase: any): Promise<Product[]> {
+  const products: Product[] = [];
+  let from = 0;
+
+  while (true) {
+    const { data, error } = await supabase
+      .from("products")
+      .select("*, brand:brands!products_brand_id_fkey(id,name)")
+      .eq("status", "active")
+      .is("deleted_at", null)
+      .order("product_name", { ascending: true })
+      .order("id", { ascending: true })
+      .range(from, from + PRODUCT_PAGE_SIZE - 1);
+
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    const page = (data || []) as Product[];
+    products.push(...page);
+
+    if (page.length < PRODUCT_PAGE_SIZE) {
+      return products;
+    }
+
+    from += PRODUCT_PAGE_SIZE;
+  }
 }
 
 export async function getQuotationWithItems(

@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { QuotationBuilder } from "@/components/quotation-builder";
-import { getCompanySettings, getQuotationWithItems } from "@/lib/data";
+import { getActiveQuotationProducts, getCompanySettings, getQuotationWithItems } from "@/lib/data";
 import { requireUser } from "@/lib/supabase/server";
 import type { Customer, Product } from "@/lib/types";
 
@@ -10,17 +10,11 @@ export default async function EditQuotationPage({ params }: { params: Promise<{ 
   const [settings, quotationResult, productsResult, customersResult] = await Promise.all([
     getCompanySettings(supabase),
     getQuotationWithItems(supabase, id).catch(() => null),
-    supabase
-      .from("products")
-      .select("*, brand:brands!products_brand_id_fkey(id,name)")
-      .eq("status", "active")
-      .is("deleted_at", null)
-      .order("product_name"),
+    getActiveQuotationProducts(supabase),
     supabase.from("customers").select("*").order("customer_name")
   ]);
 
   if (!quotationResult) notFound();
-  if (productsResult.error) throw new Error(productsResult.error.message);
   if (customersResult.error) throw new Error(customersResult.error.message);
 
   return (
@@ -30,7 +24,7 @@ export default async function EditQuotationPage({ params }: { params: Promise<{ 
         <p className="text-sm text-slate-500">{quotationResult.quotation.quote_number}</p>
       </div>
       <QuotationBuilder
-        products={(productsResult.data || []) as Product[]}
+        products={productsResult as Product[]}
         customers={(customersResult.data || []) as Customer[]}
         settings={settings}
         maxDiscountPercent={user.maxDiscountPercent}

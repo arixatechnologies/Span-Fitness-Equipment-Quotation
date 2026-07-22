@@ -1,5 +1,5 @@
 import { QuotationBuilder } from "@/components/quotation-builder";
-import { getCompanySettings } from "@/lib/data";
+import { getActiveQuotationProducts, getCompanySettings } from "@/lib/data";
 import { requireUser } from "@/lib/supabase/server";
 import type { Customer, Product } from "@/lib/types";
 
@@ -7,16 +7,10 @@ export default async function NewQuotationPage() {
   const { supabase, user } = await requireUser();
   const [settings, productsResult, customersResult] = await Promise.all([
     getCompanySettings(supabase),
-    supabase
-      .from("products")
-      .select("*, brand:brands!products_brand_id_fkey(id,name)")
-      .eq("status", "active")
-      .is("deleted_at", null)
-      .order("product_name"),
+    getActiveQuotationProducts(supabase),
     supabase.from("customers").select("*").order("customer_name")
   ]);
 
-  if (productsResult.error) throw new Error(productsResult.error.message);
   if (customersResult.error) throw new Error(customersResult.error.message);
 
   return (
@@ -28,7 +22,7 @@ export default async function NewQuotationPage() {
         </p>
       </div>
       <QuotationBuilder
-        products={(productsResult.data || []) as Product[]}
+        products={productsResult as Product[]}
         customers={(customersResult.data || []) as Customer[]}
         settings={settings}
         maxDiscountPercent={user.maxDiscountPercent}

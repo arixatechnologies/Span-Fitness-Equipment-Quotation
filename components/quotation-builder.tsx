@@ -137,11 +137,48 @@ function productMatchesSearch(product: BuilderProduct, search: string) {
   const term = search.trim().toLowerCase();
   if (!term) return true;
 
-  return [product.sku, product.product_name]
+  return [product.sku, product.product_name, product.brand?.name, product.description]
     .filter(Boolean)
     .join(" ")
     .toLowerCase()
     .includes(term);
+}
+
+function productSearchRank(product: BuilderProduct, search: string) {
+  const term = search.trim().toLowerCase();
+  if (!term) return 0;
+
+  const sku = product.sku?.toLowerCase() || "";
+  const name = product.product_name?.toLowerCase() || "";
+  const brand = product.brand?.name?.toLowerCase() || "";
+  const description = product.description?.toLowerCase() || "";
+
+  if (name === term || sku === term) return 0;
+  if (name.startsWith(term)) return 1;
+  if (sku.startsWith(term)) return 2;
+  if (brand.startsWith(term)) return 3;
+  if (name.includes(term)) return 4;
+  if (sku.includes(term)) return 5;
+  if (brand.includes(term)) return 6;
+  if (description.includes(term)) return 7;
+  return 8;
+}
+
+function getFilteredProducts(products: BuilderProduct[], search: string) {
+  const term = search.trim();
+  const matchedProducts = products.filter((product) => productMatchesSearch(product, term));
+
+  if (!term) return matchedProducts.slice(0, 60);
+
+  return [...matchedProducts]
+    .sort((left, right) => {
+      const rankDifference =
+        productSearchRank(left, term) - productSearchRank(right, term);
+      if (rankDifference) return rankDifference;
+
+      return left.product_name.localeCompare(right.product_name);
+    })
+    .slice(0, 120);
 }
 
 function getDiscountPercent(item: QuotationItemInput) {
@@ -166,7 +203,7 @@ function ProductDropdown({
   onClear
 }: ProductDropdownProps) {
   const filteredProducts = useMemo(
-    () => products.filter((product) => productMatchesSearch(product, search)).slice(0, 60),
+    () => getFilteredProducts(products, search),
     [products, search]
   );
   const selectedLabel = item.product_name
