@@ -343,7 +343,6 @@ function whatsAppPhoneNumber(phone: string) {
 export function QuotationActions({
   quotationId,
   editHref,
-  initialPdfUrl,
   previewFrameId,
   proformaFrameId,
   autoDownload = false,
@@ -365,9 +364,8 @@ export function QuotationActions({
   quoteNumber: string;
   grandTotal: number;
 }) {
-  const [pdfUrl, setPdfUrl] = useState(initialPdfUrl || "");
   const [pendingAction, setPendingAction] = useState<
-    "" | "generate" | "download" | "proforma" | "excel"
+    "" | "generate" | "download" | "proforma" | "excel" | "whatsapp"
   >("");
   const loading = Boolean(pendingAction);
   const downloadButtonRef = useRef<HTMLButtonElement>(null);
@@ -502,25 +500,35 @@ export function QuotationActions({
     previewWindow.print();
   }
 
+  async function requestPdfUrl(download: boolean) {
+    const response = await fetch(
+      `/api/quotations/${quotationId}/pdf${download ? "?download=1" : ""}`,
+      {
+        method: "POST"
+      }
+    );
+    const result = await response.json().catch(() => null);
+
+    if (!response.ok) {
+      throw new Error(result?.error || "Unable to generate PDF");
+    }
+
+    const url = download ? result?.downloadUrl || result?.url : result?.url || result?.downloadUrl;
+
+    if (!url) {
+      throw new Error("Unable to create PDF link");
+    }
+
+    return url as string;
+  }
+
   async function generatePdf() {
     setPendingAction("generate");
 
     try {
-      const response = await fetch(`/api/quotations/${quotationId}/pdf`, {
-        method: "POST"
-      });
-
-      const result = await response.json();
-
-      if (!response.ok) {
-        alert(result.error || "Unable to generate PDF");
-        return "";
-      }
-
-      setPdfUrl(result.url);
-      return result.url as string;
-    } catch {
-      alert("Unable to generate PDF");
+      return await requestPdfUrl(false);
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "Unable to generate PDF");
       return "";
     } finally {
       setPendingAction("");
@@ -603,22 +611,28 @@ export function QuotationActions({
       return;
     }
 
-    const url = await generatePdf();
+    setPendingAction("whatsapp");
 
-    if (!url) return;
+    try {
+      const url = await requestPdfUrl(true);
 
-    const message = `Hello ${customerName},
+      const message = `Hello ${customerName},
 Please find attached your quotation from Span Fitness Equipments.
 Quotation No: ${quoteNumber}
 Grand Total: ${formatCurrency(grandTotal)}
 PDF Link: ${url}
 Thank you.`;
 
-    window.open(
-      `https://wa.me/${phoneNumber}?text=${encodeURIComponent(message)}`,
-      "_blank",
-      "noopener,noreferrer"
-    );
+      window.open(
+        `https://wa.me/${phoneNumber}?text=${encodeURIComponent(message)}`,
+        "_blank",
+        "noopener,noreferrer"
+      );
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "Unable to share on WhatsApp");
+    } finally {
+      setPendingAction("");
+    }
   }
 
   return (

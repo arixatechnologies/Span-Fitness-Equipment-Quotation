@@ -8,7 +8,7 @@ import {
   Text,
   View
 } from "@react-pdf/renderer";
-import { formatCustomerName, formatDate } from "@/lib/format";
+import { formatCustomerName, formatDate, normalizeSignedZero } from "@/lib/format";
 import type { PdfChromeImages } from "@/lib/pdf-assets";
 import type { CompanySettings, Customer, Quotation, QuotationItem } from "@/lib/types";
 
@@ -205,7 +205,9 @@ const styles = StyleSheet.create({
 });
 
 function amount(value: number | string | null | undefined) {
-  return new Intl.NumberFormat("en-IN", { maximumFractionDigits: 0 }).format(Number(value || 0));
+  return new Intl.NumberFormat("en-IN", { maximumFractionDigits: 0 }).format(
+    normalizeSignedZero(Number(value || 0))
+  );
 }
 
 function customerFullAddress(customer: Partial<Customer>) {
@@ -271,10 +273,10 @@ function ProductTable({
         <HeaderCell index={0}>#</HeaderCell>
         <HeaderCell index={1}>Product</HeaderCell>
         <HeaderCell index={2}>Description</HeaderCell>
-        <HeaderCell index={3}>{"Unit Price\n(Rs.)"}</HeaderCell>
-        <HeaderCell index={4}>{"Special Price\n(Rs.)"}</HeaderCell>
+        <HeaderCell index={3}>{"Unit Price\n(\u20b9)"}</HeaderCell>
+        <HeaderCell index={4}>{"Special Price\n(\u20b9)"}</HeaderCell>
         <HeaderCell index={5}>Qty</HeaderCell>
-        <HeaderCell index={6}>{"Total\n(Rs.)"}</HeaderCell>
+        <HeaderCell index={6}>{"Total\n(\u20b9)"}</HeaderCell>
       </View>
 
       {items.map((item, index) => {

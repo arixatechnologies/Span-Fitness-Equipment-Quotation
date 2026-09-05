@@ -6,7 +6,8 @@ import type {
 } from "@/lib/types";
 
 function toMoney(value: number) {
-  return Math.round((value + Number.EPSILON) * 100) / 100;
+  const amount = Math.round((value + Number.EPSILON) * 100) / 100;
+  return Object.is(amount, -0) || Math.abs(amount) < 0.005 ? 0 : amount;
 }
 
 export function calculateQuotation(

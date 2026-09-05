@@ -1,5 +1,9 @@
+export function normalizeSignedZero(value: number) {
+  return Object.is(value, -0) || Math.abs(value) < 0.005 ? 0 : value;
+}
+
 export function formatCurrency(value: number | string | null | undefined) {
-  const amount = typeof value === "string" ? Number(value) : value || 0;
+  const amount = normalizeSignedZero(typeof value === "string" ? Number(value) : value || 0);
 
   return new Intl.NumberFormat("en-IN", {
     style: "currency",
@@ -9,7 +13,7 @@ export function formatCurrency(value: number | string | null | undefined) {
 }
 
 export function formatNumber(value: number | string | null | undefined) {
-  const amount = typeof value === "string" ? Number(value) : value || 0;
+  const amount = normalizeSignedZero(typeof value === "string" ? Number(value) : value || 0);
   return new Intl.NumberFormat("en-IN", {
     maximumFractionDigits: 2
   }).format(amount);

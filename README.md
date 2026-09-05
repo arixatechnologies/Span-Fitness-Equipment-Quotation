@@ -58,6 +58,7 @@ SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 NEXT_PUBLIC_SITE_URL=http://localhost:3000
 ADMIN_EMAIL=admin@spanfitness.com
 AUTH_SECRET=replace-with-a-long-random-secret
+CRON_SECRET=replace-with-a-long-random-cron-secret
 ```
 
 4. Apply Supabase migrations in order:
@@ -118,6 +119,9 @@ The migration creates these buckets:
 - `member-photos` public, for team member profile photos.
 
 Generated PDFs are uploaded to `quotation-pdfs` and shared through signed URLs.
+Generated PDF files are cleaned automatically after 5 days by the `/api/cron/cleanup-pdfs`
+cron route. This cleanup removes only the stored PDF files and PDF link metadata; quotation,
+customer, product, and quotation item data remains in the database.
 
 ## Database Tables
 
