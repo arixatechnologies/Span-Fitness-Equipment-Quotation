@@ -500,13 +500,16 @@ export function QuotationActions({
     previewWindow.print();
   }
 
-  async function requestPdfUrl(download: boolean) {
-    const response = await fetch(
-      `/api/quotations/${quotationId}/pdf${download ? "?download=1" : ""}`,
-      {
-        method: "POST"
-      }
-    );
+  async function requestPdfUrl(download: boolean, forceRegenerate = false) {
+    const searchParams = new URLSearchParams();
+
+    if (download) searchParams.set("download", "1");
+    if (forceRegenerate) searchParams.set("force", "1");
+
+    const query = searchParams.toString();
+    const response = await fetch(`/api/quotations/${quotationId}/pdf${query ? `?${query}` : ""}`, {
+      method: "POST"
+    });
     const result = await response.json().catch(() => null);
 
     if (!response.ok) {
@@ -614,7 +617,7 @@ export function QuotationActions({
     setPendingAction("whatsapp");
 
     try {
-      const url = await requestPdfUrl(true);
+      const url = await requestPdfUrl(true, true);
 
       const message = `Hello ${customerName},
 Please find attached your quotation from Span Fitness Equipments.

@@ -188,12 +188,14 @@ async function storeQuotationPdf(supabase: any, id: string) {
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const isDownload = new URL(request.url).searchParams.get("download") === "1";
+  const url = new URL(request.url);
+  const isDownload = url.searchParams.get("download") === "1";
+  const forceRegenerate = url.searchParams.get("force") === "1";
 
   try {
     const { supabase, user } = await requireUser();
 
-    if (isDownload) {
+    if (isDownload && !forceRegenerate) {
       const storedPdf = await getStoredPdfDownload(supabase, id);
 
       if (storedPdf) {
