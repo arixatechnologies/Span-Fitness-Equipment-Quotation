@@ -14,7 +14,7 @@ import {
   discountLimitMessage,
   getMinimumSpecialPrice
 } from "@/lib/discount-limit";
-import { formatCustomerName } from "@/lib/format";
+import { formatCustomerName, normalizeRoundedDisplayNumber } from "@/lib/format";
 import type {
   CompanySettings,
   Customer,
@@ -55,7 +55,7 @@ function roundMoney(value: number) {
 function formatAmount(value: number | string | null | undefined) {
   const amount = Number(value || 0);
   if (!Number.isFinite(amount)) return "0";
-  return String(Math.round(amount));
+  return String(normalizeRoundedDisplayNumber(amount));
 }
 
 function formatTaxAmount(value: number | string | null | undefined) {

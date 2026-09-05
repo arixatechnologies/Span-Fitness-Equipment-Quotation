@@ -8,7 +8,7 @@ import {
   Text,
   View
 } from "@react-pdf/renderer";
-import { formatCustomerName, formatDate, normalizeSignedZero } from "@/lib/format";
+import { formatCustomerName, formatDate, normalizeRoundedDisplayNumber } from "@/lib/format";
 import type { PdfChromeImages } from "@/lib/pdf-assets";
 import type { CompanySettings, Customer, Quotation, QuotationItem } from "@/lib/types";
 
@@ -206,7 +206,7 @@ const styles = StyleSheet.create({
 
 function amount(value: number | string | null | undefined) {
   return new Intl.NumberFormat("en-IN", { maximumFractionDigits: 0 }).format(
-    normalizeSignedZero(Number(value || 0))
+    normalizeRoundedDisplayNumber(Number(value || 0))
   );
 }
 

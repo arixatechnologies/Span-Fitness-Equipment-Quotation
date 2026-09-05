@@ -11,7 +11,7 @@ import ExcelJS, {
   type Worksheet
 } from "exceljs";
 import sharp from "sharp";
-import { formatCustomerName } from "@/lib/format";
+import { formatCustomerName, normalizeRoundedDisplayNumber } from "@/lib/format";
 import { isSafeProductImageUrl } from "@/lib/product-image-url";
 import type {
   CompanySettings,
@@ -64,7 +64,9 @@ function text(value: unknown) {
 
 function amount(value: unknown) {
   const numericValue = Number(value || 0);
-  return Number.isFinite(numericValue) ? numericValue : 0;
+  if (!Number.isFinite(numericValue)) return 0;
+
+  return normalizeRoundedDisplayNumber(numericValue) === 0 ? 0 : numericValue;
 }
 
 function formatDateForSheet(value: string) {
