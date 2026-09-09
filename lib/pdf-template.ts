@@ -126,6 +126,10 @@ function tableColumns(documentVariant: PdfDocumentVariant) {
   `;
 }
 
+function currencyHeaderMark() {
+  return `<span class="currency-mark" aria-label="Indian rupee">(<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 3h12"></path><path d="M6 8h12"></path><path d="M6 13h3"></path><path d="M9 13c6.667 0 6.667-10 0-10"></path><path d="m6 13 8.5 8"></path></svg>)</span>`;
+}
+
 function tableHead(documentVariant: PdfDocumentVariant) {
   if (documentVariant === "proforma") {
     return `
@@ -133,10 +137,10 @@ function tableHead(documentVariant: PdfDocumentVariant) {
       <tr>
         <th>#</th>
         <th>Description</th>
-        <th>Unit Price<br>(&#8377;)</th>
-        <th>Special<br>Price (&#8377;)</th>
+        <th>Unit Price<br>${currencyHeaderMark()}</th>
+        <th>Special<br>Price ${currencyHeaderMark()}</th>
         <th>Qty</th>
-        <th>Total<br>(&#8377;)</th>
+        <th>Total<br>${currencyHeaderMark()}</th>
       </tr>
     </thead>
   `;
@@ -148,10 +152,10 @@ function tableHead(documentVariant: PdfDocumentVariant) {
         <th>#</th>
         <th>Product</th>
         <th>Description</th>
-        <th>Unit Price<br>(&#8377;)</th>
-        <th>Special<br>Price (&#8377;)</th>
+        <th>Unit Price<br>${currencyHeaderMark()}</th>
+        <th>Special<br>Price ${currencyHeaderMark()}</th>
         <th>Qty</th>
-        <th>Total<br>(&#8377;)</th>
+        <th>Total<br>${currencyHeaderMark()}</th>
       </tr>
     </thead>
   `;
@@ -633,6 +637,25 @@ html, body {
   text-align: center;
   font-weight: 900;
   vertical-align: middle;
+}
+
+.currency-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: .35mm;
+  white-space: nowrap;
+  vertical-align: -.2mm;
+}
+
+.currency-mark svg {
+  width: 2.7mm;
+  height: 2.7mm;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.25;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 .product-table .p-row td { height: 32.5mm; }

@@ -98,7 +98,9 @@ export async function getQuotationWithItems(
     .from("quotation_items")
     .select("*")
     .eq("quotation_id", id)
-    .order("created_at", { ascending: true });
+    .order("sort_order", { ascending: true })
+    .order("created_at", { ascending: true })
+    .order("id", { ascending: true });
 
   if (itemsError) {
     throw new Error(itemsError.message);

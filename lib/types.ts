@@ -194,4 +194,5 @@ export type Quotation = {
 export type QuotationItem = CalculatedQuotationItem & {
   id: string;
   quotation_id: string;
+  sort_order: number;
 };

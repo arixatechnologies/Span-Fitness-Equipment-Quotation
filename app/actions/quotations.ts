@@ -146,7 +146,8 @@ export async function saveQuotationAction(formData: FormData) {
     status
   );
 
-  const itemPayload = calculated.items.map((item) => ({
+  const itemPayload = calculated.items.map((item, index) => ({
+    sort_order: index + 1,
     product_id: item.product_id || null,
     sku: item.sku,
     product_name: item.product_name,
