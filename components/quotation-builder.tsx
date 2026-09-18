@@ -1,8 +1,10 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useFormStatus } from "react-dom";
 import { ChevronDown, Plus, Trash2 } from "lucide-react";
 import { saveQuotationAction } from "@/app/actions/quotations";
+import { LoadingUi } from "@/components/loading-ui";
 import { PhoneInput } from "@/components/phone-input";
 import { ProductImage } from "@/components/product-image";
 import { RequiredMark } from "@/components/required-mark";
@@ -47,6 +49,22 @@ type ProductDropdownProps = {
   onSelect: (product: BuilderProduct) => void;
   onClear: () => void;
 };
+
+function QuotationSavingOverlay({ isEdit }: { isEdit: boolean }) {
+  const { pending } = useFormStatus();
+
+  if (!pending) return null;
+
+  return (
+    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-white/70 backdrop-blur-sm">
+      <LoadingUi
+        variant="page"
+        title={isEdit ? "Updating quotation" : "Creating quotation"}
+        subtitle="Saving quotation details."
+      />
+    </div>
+  );
+}
 
 function roundMoney(value: number) {
   return Math.round((value + Number.EPSILON) * 100) / 100;
@@ -483,6 +501,7 @@ export function QuotationBuilder({
 
   return (
     <form action={saveQuotationAction} className="grid min-w-0 gap-5">
+      <QuotationSavingOverlay isEdit={Boolean(quotation)} />
       <input type="hidden" name="quotation_id" value={quotation?.id || ""} />
       <input type="hidden" name="items" value={JSON.stringify(selectedItems)} />
       <input type="hidden" name="customer_id" value={customerMode === "existing" ? customerId : ""} />

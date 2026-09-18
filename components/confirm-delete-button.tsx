@@ -2,6 +2,7 @@
 
 import { AlertTriangle, Trash2, X } from "lucide-react";
 import { useState } from "react";
+import { createPortal } from "react-dom";
 import { deleteCustomerAction } from "@/app/actions/customers";
 import { deleteMemberAction } from "@/app/actions/members";
 import { deleteQuotationAction } from "@/app/actions/quotations";
@@ -56,6 +57,62 @@ export function ConfirmDeleteButton({
   const [isOpen, setIsOpen] = useState(false);
   const action = deleteActions[entity];
   const copy = confirmationCopy[entity];
+  const dialog = isOpen ? (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 p-4"
+      role="presentation"
+      onMouseDown={(event) => {
+        if (event.currentTarget === event.target) setIsOpen(false);
+      }}
+    >
+      <div
+        className="w-full max-w-md rounded-lg border border-line bg-white p-5 shadow-2xl"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={`delete-${entity}-${id}-title`}
+      >
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex min-w-0 items-start gap-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-red-50 text-red-700">
+              <AlertTriangle className="h-5 w-5" aria-hidden="true" />
+            </div>
+            <div>
+              <h2
+                id={`delete-${entity}-${id}-title`}
+                className="text-lg font-black text-slate-950"
+              >
+                {copy.title}
+              </h2>
+              <p className="mt-1 text-sm leading-6 text-slate-600">
+                {copy.description(itemName)} This action cannot be undone.
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            className="rounded-md p-1.5 text-slate-500 transition hover:bg-slate-100 hover:text-slate-900"
+            onClick={() => setIsOpen(false)}
+            aria-label="Close delete confirmation"
+          >
+            <X className="h-5 w-5" aria-hidden="true" />
+          </button>
+        </div>
+
+        <div className="mt-6 flex justify-end gap-2">
+          <button type="button" className="btn-secondary" onClick={() => setIsOpen(false)}>
+            Cancel
+          </button>
+          <form action={action}>
+            <input type="hidden" name="id" value={id} />
+            <SubmitButton className="btn-danger" pendingLabel="Deleting...">
+              <Trash2 className="h-4 w-4" aria-hidden="true" />
+              Delete
+            </SubmitButton>
+          </form>
+        </div>
+      </div>
+    </div>
+  ) : null;
 
   return (
     <>
@@ -70,62 +127,7 @@ export function ConfirmDeleteButton({
         {showLabel ? <span>Delete</span> : null}
       </button>
 
-      {isOpen ? (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 p-4"
-          role="presentation"
-          onMouseDown={(event) => {
-            if (event.currentTarget === event.target) setIsOpen(false);
-          }}
-        >
-          <div
-            className="w-full max-w-md rounded-lg border border-line bg-white p-5 shadow-2xl"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby={`delete-${entity}-${id}-title`}
-          >
-            <div className="flex items-start justify-between gap-4">
-              <div className="flex min-w-0 items-start gap-3">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-red-50 text-red-700">
-                  <AlertTriangle className="h-5 w-5" aria-hidden="true" />
-                </div>
-                <div>
-                  <h2
-                    id={`delete-${entity}-${id}-title`}
-                    className="text-lg font-black text-slate-950"
-                  >
-                    {copy.title}
-                  </h2>
-                  <p className="mt-1 text-sm leading-6 text-slate-600">
-                    {copy.description(itemName)} This action cannot be undone.
-                  </p>
-                </div>
-              </div>
-              <button
-                type="button"
-                className="rounded-md p-1.5 text-slate-500 transition hover:bg-slate-100 hover:text-slate-900"
-                onClick={() => setIsOpen(false)}
-                aria-label="Close delete confirmation"
-              >
-                <X className="h-5 w-5" aria-hidden="true" />
-              </button>
-            </div>
-
-            <div className="mt-6 flex justify-end gap-2">
-              <button type="button" className="btn-secondary" onClick={() => setIsOpen(false)}>
-                Cancel
-              </button>
-              <form action={action}>
-                <input type="hidden" name="id" value={id} />
-                <SubmitButton className="btn-danger" pendingLabel="Deleting...">
-                  <Trash2 className="h-4 w-4" aria-hidden="true" />
-                  Delete
-                </SubmitButton>
-              </form>
-            </div>
-          </div>
-        </div>
-      ) : null}
+      {dialog && typeof document !== "undefined" ? createPortal(dialog, document.body) : null}
     </>
   );
 }

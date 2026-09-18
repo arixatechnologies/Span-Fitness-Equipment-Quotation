@@ -312,6 +312,7 @@ import {
   Loader2,
   Pencil
 } from "lucide-react";
+import { LoadingUi } from "@/components/loading-ui";
 import { formatCurrency, quotationDownloadBaseName } from "@/lib/format";
 
 function WhatsAppIcon({ className }: { className?: string }) {
@@ -339,6 +340,21 @@ function whatsAppPhoneNumber(phone: string) {
 
   return "";
 }
+
+const actionLoadingCopy = {
+  proforma: {
+    title: "Preparing Proforma Invoice",
+    subtitle: "Opening the PDF print window."
+  },
+  excel: {
+    title: "Preparing Excel",
+    subtitle: "Generating quotation spreadsheet."
+  },
+  whatsapp: {
+    title: "Preparing WhatsApp",
+    subtitle: "Generating the shareable PDF link."
+  }
+} as const;
 
 export function QuotationActions({
   quotationId,
@@ -372,6 +388,10 @@ export function QuotationActions({
   const proformaButtonRef = useRef<HTMLButtonElement>(null);
   const autoDownloadStarted = useRef(false);
   const resolvedAutoDownloadMode = autoDownloadMode || (autoDownload ? "pdf" : false);
+  const overlayCopy =
+    pendingAction === "proforma" || pendingAction === "excel" || pendingAction === "whatsapp"
+      ? actionLoadingCopy[pendingAction]
+      : null;
 
   useEffect(() => {
     if (!resolvedAutoDownloadMode || autoDownloadStarted.current) return;
@@ -639,7 +659,18 @@ Thank you.`;
   }
 
   return (
-    <div className="grid w-full gap-2 sm:flex sm:w-auto sm:flex-wrap">
+    <>
+      {overlayCopy ? (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-white/70 backdrop-blur-sm">
+          <LoadingUi
+            variant="page"
+            title={overlayCopy.title}
+            subtitle={overlayCopy.subtitle}
+          />
+        </div>
+      ) : null}
+
+      <div className="grid w-full gap-2 sm:flex sm:w-auto sm:flex-wrap">
       <button
         type="button"
         onClick={generatePdf}
@@ -717,6 +748,7 @@ Thank you.`;
       >
         <WhatsAppIcon className="h-6 w-6" />
       </button>
-    </div>
+      </div>
+    </>
   );
 }

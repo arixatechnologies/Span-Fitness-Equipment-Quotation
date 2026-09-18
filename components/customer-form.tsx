@@ -1,5 +1,9 @@
+"use client";
+
 import Link from "next/link";
+import { useFormStatus } from "react-dom";
 import { saveCustomerAction } from "@/app/actions/customers";
+import { LoadingUi } from "@/components/loading-ui";
 import { PhoneInput } from "@/components/phone-input";
 import { RequiredMark } from "@/components/required-mark";
 import { StateCitySelects } from "@/components/state-city-selects";
@@ -7,9 +11,26 @@ import { SubmitButton } from "@/components/submit-button";
 import { customerSuffixOptions } from "@/lib/customer-options";
 import type { Customer } from "@/lib/types";
 
+function CustomerSavingOverlay({ isEdit }: { isEdit: boolean }) {
+  const { pending } = useFormStatus();
+
+  if (!pending) return null;
+
+  return (
+    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-white/70 backdrop-blur-sm">
+      <LoadingUi
+        variant="page"
+        title={isEdit ? "Updating customer" : "Saving customer"}
+        subtitle="Saving customer details."
+      />
+    </div>
+  );
+}
+
 export function CustomerForm({ customer }: { customer?: Customer }) {
   return (
     <form action={saveCustomerAction} className="panel p-5">
+      <CustomerSavingOverlay isEdit={Boolean(customer)} />
       <input type="hidden" name="id" value={customer?.id || ""} />
       <div className="grid gap-4 md:grid-cols-2">
         <label>

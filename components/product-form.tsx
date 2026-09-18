@@ -2,8 +2,10 @@
 
 import Link from "next/link";
 import { useActionState } from "react";
+import { useFormStatus } from "react-dom";
 import { saveProductAction } from "@/app/actions/products";
 import { ActionFeedback } from "@/components/action-feedback";
+import { LoadingUi } from "@/components/loading-ui";
 import { ProductImageInput } from "@/components/product-image-input";
 import { RequiredMark } from "@/components/required-mark";
 import { SubmitButton } from "@/components/submit-button";
@@ -15,11 +17,28 @@ type ProductFormProps = {
   brands: Brand[];
 };
 
+function ProductSavingOverlay({ isEdit }: { isEdit: boolean }) {
+  const { pending } = useFormStatus();
+
+  if (!pending) return null;
+
+  return (
+    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-white/70 backdrop-blur-sm">
+      <LoadingUi
+        variant="page"
+        title={isEdit ? "Updating product" : "Saving product"}
+        subtitle="Saving product details."
+      />
+    </div>
+  );
+}
+
 export function ProductForm({ product, brands }: ProductFormProps) {
   const [state, formAction] = useActionState(saveProductAction, initialActionState);
 
   return (
     <form action={formAction} className="panel p-5">
+      <ProductSavingOverlay isEdit={Boolean(product)} />
       <input type="hidden" name="id" value={product?.id || ""} />
       <input type="hidden" name="gst_percent" value={product?.gst_percent || 18} />
       <input type="hidden" name="status" value={product?.status || "active"} />
