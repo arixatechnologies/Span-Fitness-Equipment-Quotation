@@ -8,7 +8,7 @@ import {
   isValidPhoneList,
   PHONE_LIST_VALIDATION_MESSAGE
 } from "@/lib/phone";
-import { requireUser } from "@/lib/supabase/server";
+import { requireAdmin } from "@/lib/supabase/server";
 import {
   imageExtension,
   imageUploadError,
@@ -57,7 +57,7 @@ async function uploadAsset(
 }
 
 export async function saveCompanySettingsAction(formData: FormData) {
-  const { supabase, user } = await requireUser();
+  const { supabase, user } = await requireAdmin();
   const current = await getCompanySettings(supabase);
   const logoUrl = await uploadAsset(
     supabase,
@@ -123,7 +123,7 @@ export async function saveCompanySettingsAction(formData: FormData) {
 }
 
 export async function saveFooterLogoAction(formData: FormData) {
-  const { supabase } = await requireUser();
+  const { supabase } = await requireAdmin();
   const file = formData.get("image") as File | null;
   const imageUrl = await uploadAsset(supabase, file, clean(formData.get("image_url")), "brand-logos");
   const id = String(formData.get("id") || "");

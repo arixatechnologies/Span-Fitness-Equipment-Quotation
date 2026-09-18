@@ -25,6 +25,16 @@ const memberSchema = z.object({
   status: z.enum(["active", "inactive"])
 });
 
+const updateMemberSchema = memberSchema.extend({
+  id: z.string().uuid(),
+  password: z
+    .string()
+    .max(128)
+    .refine((value) => !value || value.length >= 8, {
+      message: "New password must contain at least 8 characters."
+    })
+});
+
 async function uploadMemberPhoto(supabase: any, file: File | null) {
   if (!file || file.size === 0) {
     return { url: null, path: null };
@@ -113,6 +123,109 @@ export async function addMemberAction(formData: FormData) {
   });
 
   revalidatePath("/members");
+  redirect("/members");
+}
+
+export async function updateMemberAction(formData: FormData) {
+  const { supabase, user } = await requireAdmin();
+  const parsed = updateMemberSchema.parse({
+    id: formData.get("id"),
+    member_name: formData.get("member_name"),
+    phone_number: formData.get("phone_number"),
+    email: String(formData.get("email") || "").toLowerCase(),
+    password: String(formData.get("password") || ""),
+    role: formData.get("role"),
+    branch_location: formData.get("branch_location"),
+    max_discount_percent: formData.get("max_discount_percent"),
+    status: formData.get("status")
+  });
+
+  if (parsed.email === getAdminEmail().trim().toLowerCase()) {
+    throw new Error("This email is reserved for the main administrator account.");
+  }
+
+  if (user.id === parsed.id && parsed.status === "inactive") {
+    throw new Error("You cannot deactivate your own account.");
+  }
+
+  if (user.id === parsed.id && parsed.role !== "Admin") {
+    throw new Error("You cannot remove your own administrator access.");
+  }
+
+  const { data: current, error: currentError } = await supabase
+    .from("team_members")
+    .select("profile_photo_url, profile_photo_path")
+    .eq("id", parsed.id)
+    .single();
+  if (currentError) throw new Error(currentError.message);
+
+  const photo = await uploadMemberPhoto(
+    supabase,
+    formData.get("profile_photo") as File | null
+  );
+  const removePhoto = formData.get("remove_photo") === "on";
+  const profilePhotoUrl = photo.url
+    ? photo.url
+    : removePhoto
+      ? null
+      : current.profile_photo_url;
+  const profilePhotoPath = photo.path
+    ? photo.path
+    : removePhoto
+      ? null
+      : current.profile_photo_path;
+  const payload: Record<string, unknown> = {
+    member_name: parsed.member_name,
+    phone_number: parsed.phone_number,
+    email: parsed.email,
+    role: parsed.role,
+    branch_location: parsed.branch_location,
+    max_discount_percent: parsed.max_discount_percent,
+    status: parsed.status,
+    profile_photo_url: profilePhotoUrl,
+    profile_photo_path: profilePhotoPath
+  };
+
+  if (parsed.password) {
+    payload.password_hash = await hashMemberPassword(parsed.password);
+  }
+
+  const { error } = await supabase.from("team_members").update(payload).eq("id", parsed.id);
+
+  if (error) {
+    if (photo.path) {
+      await supabase.storage.from("member-photos").remove([photo.path]);
+    }
+
+    if (error.code === "23505") {
+      throw new Error("A team member with this email already exists.");
+    }
+
+    throw new Error(error.message);
+  }
+
+  if (
+    current.profile_photo_path &&
+    (photo.path || removePhoto) &&
+    current.profile_photo_path !== profilePhotoPath
+  ) {
+    await supabase.storage.from("member-photos").remove([current.profile_photo_path]);
+  }
+
+  await logActivity(supabase, {
+    userId: user.id,
+    action: "Team member edited",
+    entityType: "team_member",
+    entityId: parsed.id,
+    metadata: {
+      role: parsed.role,
+      maxDiscountPercent: parsed.max_discount_percent
+    }
+  });
+
+  revalidatePath("/members");
+  revalidatePath(`/members/${parsed.id}/edit`);
+  revalidatePath("/", "layout");
   redirect("/members");
 }
 

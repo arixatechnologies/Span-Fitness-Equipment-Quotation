@@ -1,7 +1,7 @@
 import { MyProfileForm, type MyProfileFormValue } from "@/components/my-profile-form";
 import { SettingsTabs } from "@/components/settings-tabs";
 import { getAdminEmail } from "@/lib/auth/session";
-import { requireUser } from "@/lib/supabase/server";
+import { requireAdmin } from "@/lib/supabase/server";
 
 type SearchParams = Record<string, string | string[] | undefined>;
 
@@ -11,7 +11,7 @@ export default async function ProfileSettingsPage({
   searchParams: Promise<SearchParams>;
 }) {
   const params = await searchParams;
-  const { supabase, user } = await requireUser();
+  const { supabase, user } = await requireAdmin();
   const isMember = Boolean(user.id);
   let profile: MyProfileFormValue;
 

@@ -13,7 +13,7 @@ import {
 } from "@/lib/auth/session";
 import { logActivity } from "@/lib/data";
 import { isTenDigitPhone, PHONE_VALIDATION_MESSAGE } from "@/lib/phone";
-import { requireUser } from "@/lib/supabase/server";
+import { requireAdmin } from "@/lib/supabase/server";
 import {
   imageExtension,
   imageUploadError,
@@ -56,7 +56,7 @@ async function uploadProfilePhoto(supabase: any, file: File | null) {
 }
 
 export async function saveMyProfileAction(formData: FormData) {
-  const { supabase, user } = await requireUser();
+  const { supabase, user } = await requireAdmin();
   const isMember = Boolean(user.id);
   const accountEmail = isMember
     ? String(formData.get("email") || "").toLowerCase()

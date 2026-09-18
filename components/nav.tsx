@@ -29,7 +29,7 @@ const navItems = [
   { href: "/quotations", label: "Quotations", icon: FileText },
   { href: "/members", label: "Add Member", icon: UserPlus, adminOnly: true },
   { href: "/image-to-link", label: "Image to Link", icon: ImageUp },
-  { href: "/settings/company", label: "Settings", icon: Settings }
+  { href: "/settings/company", label: "Settings", icon: Settings, adminOnly: true }
 ];
 
 export function Sidebar({ role = "Admin" }: { role?: TeamMemberRole }) {

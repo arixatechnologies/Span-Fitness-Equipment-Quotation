@@ -53,7 +53,8 @@ export async function requireUser() {
       role: member?.role || session.role,
       branchLocation: member?.branch_location || session.branchLocation,
       profilePhotoUrl: member?.profile_photo_url || session.profilePhotoUrl,
-      maxDiscountPercent: member ? Number(member.max_discount_percent) : null
+      maxDiscountPercent:
+        member && member.role !== "Admin" ? Number(member.max_discount_percent) : null
     }
   };
 }

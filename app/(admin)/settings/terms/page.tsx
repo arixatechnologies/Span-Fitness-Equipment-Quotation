@@ -1,10 +1,10 @@
 import { SettingsForm } from "@/components/settings-form";
 import { SettingsTabs } from "@/components/settings-tabs";
 import { getCompanySettings } from "@/lib/data";
-import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { requireAdmin } from "@/lib/supabase/server";
 
 export default async function TermsSettingsPage() {
-  const supabase = await createServerSupabaseClient();
+  const { supabase } = await requireAdmin();
   const settings = await getCompanySettings(supabase);
 
   return (

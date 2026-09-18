@@ -25,7 +25,10 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  if (session && pathname.startsWith("/members") && session.role !== "Admin") {
+  const isAdminOnlyPage =
+    pathname.startsWith("/members") || pathname.startsWith("/settings");
+
+  if (session && isAdminOnlyPage && session.role !== "Admin") {
     const url = request.nextUrl.clone();
     url.pathname = "/dashboard";
     url.search = "";
