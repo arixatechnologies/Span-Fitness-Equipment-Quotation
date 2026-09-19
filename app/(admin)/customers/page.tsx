@@ -1,10 +1,13 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { Edit, Plus } from "lucide-react";
 import { ConfirmDeleteButton } from "@/components/confirm-delete-button";
+import { Pagination } from "@/components/pagination";
 import { SearchField } from "@/components/search-field";
 import { EmptyState } from "@/components/ui";
 import { formatCustomerName } from "@/lib/format";
 import { getSearchText } from "@/lib/search";
+import { buildPageHref, getPageNumber, LIST_PAGE_SIZE } from "@/lib/pagination";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
 type SearchParams = Record<string, string | string[] | undefined>;
@@ -16,8 +19,13 @@ export default async function CustomersPage({
 }) {
   const params = await searchParams;
   const q = getSearchText(params.q);
+  const page = getPageNumber(params.page);
   const supabase = await createServerSupabaseClient();
-  let query = supabase.from("customers").select("*").order("updated_at", { ascending: false });
+  let query = supabase
+    .from("customers")
+    .select("*", { count: "exact" })
+    .order("updated_at", { ascending: false })
+    .range((page - 1) * LIST_PAGE_SIZE, page * LIST_PAGE_SIZE - 1);
 
   if (q) {
     query = query.or(
@@ -25,8 +33,15 @@ export default async function CustomersPage({
     );
   }
 
-  const { data: customers, error } = await query;
+  const { data: customers, error, count } = await query;
   if (error) throw new Error(error.message);
+
+  const filteredCount = count || 0;
+  const totalPages = Math.max(1, Math.ceil(filteredCount / LIST_PAGE_SIZE));
+
+  if (filteredCount > 0 && page > totalPages) {
+    redirect(buildPageHref("/customers", { q }, totalPages));
+  }
 
   return (
     <div className="grid gap-5">
@@ -57,40 +72,41 @@ export default async function CustomersPage({
       </form>
 
       {(customers || []).length ? (
-        <section className="panel overflow-hidden">
-          <div className="grid gap-3 p-3 md:hidden">
-            {(customers || []).map((customer: any) => (
-              <div key={customer.id} className="rounded-md border border-line bg-white p-3">
-                <div className="font-black text-slate-950">{formatCustomerName(customer)}</div>
-                <div className="mt-3 grid gap-1 text-sm text-slate-700">
-                  <div>{customer.phone}</div>
-                  <div>{customer.email || "-"}</div>
-                  <div>
-                    <span className="font-semibold text-slate-500">GST Number: </span>
-                    {customer.gst_number || "-"}
+        <>
+          <section className="panel overflow-hidden">
+            <div className="grid gap-3 p-3 md:hidden">
+              {(customers || []).map((customer: any) => (
+                <div key={customer.id} className="rounded-md border border-line bg-white p-3">
+                  <div className="font-black text-slate-950">{formatCustomerName(customer)}</div>
+                  <div className="mt-3 grid gap-1 text-sm text-slate-700">
+                    <div>{customer.phone}</div>
+                    <div>{customer.email || "-"}</div>
+                    <div>
+                      <span className="font-semibold text-slate-500">GST Number: </span>
+                      {customer.gst_number || "-"}
+                    </div>
+                    <div>
+                      {[customer.address, customer.city, customer.state, customer.pincode]
+                        .filter(Boolean)
+                        .join(", ") || "-"}
+                    </div>
                   </div>
-                  <div>
-                    {[customer.address, customer.city, customer.state, customer.pincode]
-                      .filter(Boolean)
-                      .join(", ") || "-"}
+                  <div className="mt-3 grid grid-cols-2 gap-2">
+                    <Link href={`/customers/${customer.id}/edit`} className="btn-secondary w-full px-3">
+                      <Edit className="h-4 w-4" />
+                      Edit
+                    </Link>
+                    <ConfirmDeleteButton
+                      entity="customer"
+                      id={customer.id}
+                      itemName={formatCustomerName(customer)}
+                      className="btn-danger w-full px-3"
+                      showLabel
+                    />
                   </div>
                 </div>
-                <div className="mt-3 grid grid-cols-2 gap-2">
-                  <Link href={`/customers/${customer.id}/edit`} className="btn-secondary w-full px-3">
-                    <Edit className="h-4 w-4" />
-                    Edit
-                  </Link>
-                  <ConfirmDeleteButton
-                    entity="customer"
-                    id={customer.id}
-                    itemName={formatCustomerName(customer)}
-                    className="btn-danger w-full px-3"
-                    showLabel
-                  />
-                </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
 
           <div className="hidden overflow-x-auto md:block">
             <table className="w-full min-w-[980px]">
@@ -135,7 +151,15 @@ export default async function CustomersPage({
               </tbody>
             </table>
           </div>
-        </section>
+          </section>
+          <Pagination
+            pathname="/customers"
+            currentPage={page}
+            pageSize={LIST_PAGE_SIZE}
+            totalItems={filteredCount}
+            query={{ q }}
+          />
+        </>
       ) : (
         <EmptyState
           title="No customers found"

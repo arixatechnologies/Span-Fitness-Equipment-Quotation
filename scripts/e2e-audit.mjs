@@ -35,7 +35,8 @@ const cleanupState = {
   productIds: new Set(),
   productImagePaths: new Set(),
   customerIds: new Set(),
-  quotationIds: new Set()
+  quotationIds: new Set(),
+  brandIds: new Set()
 };
 
 function requiredEnv(name) {
@@ -263,6 +264,9 @@ async function cleanup() {
     await supabase.storage.from("product-images").remove(productImagePaths);
   }
 
+  const brandIds = Array.from(cleanupState.brandIds);
+  if (brandIds.length) await supabase.from("brands").delete().in("id", brandIds);
+
   const memberIds = Array.from(cleanupState.memberIds);
   if (memberIds.length) {
     await supabase.from("activity_logs").delete().in("user_id", memberIds);
@@ -320,6 +324,77 @@ async function run() {
       );
     }
     pass("all authenticated application routes");
+
+    const testBrandName = `${prefix} Brand`;
+    await page.goto(`${baseUrl}/brands?refresh=${runId}`, { waitUntil: "domcontentloaded" });
+    await page.getByRole("textbox", { name: /New Brand/ }).fill(testBrandName);
+    await page.getByRole("button", { name: "Add Brand" }).click();
+    const addBrandNotice = page.getByText("Brand Added Successfully", { exact: true });
+    await addBrandNotice.waitFor();
+    await addBrandNotice.waitFor({ state: "hidden", timeout: 5000 });
+
+    const brandResult = await supabase
+      .from("brands")
+      .select("id")
+      .eq("name", testBrandName)
+      .single();
+    if (brandResult.error) throw brandResult.error;
+    cleanupState.brandIds.add(brandResult.data.id);
+
+    await page.goto(`${baseUrl}/brands?verify=${runId}`, { waitUntil: "domcontentloaded" });
+    const brandRow = page.locator("tr").filter({
+      has: page.locator(`input[name="name"][value="${testBrandName}"]`)
+    });
+    await brandRow.getByTitle(`Delete ${testBrandName}`).click();
+    const deleteBrandNotice = page.getByText("Brand Deleted Successfully", { exact: true });
+    await deleteBrandNotice.waitFor();
+    await deleteBrandNotice.waitFor({ state: "hidden", timeout: 5000 });
+    await page.waitForURL((url) => url.pathname === "/brands" && !url.search);
+    cleanupState.brandIds.delete(brandResult.data.id);
+    pass("brand add and delete success notices auto-dismiss");
+
+    const productCountResult = await supabase
+      .from("products")
+      .select("id", { count: "exact", head: true })
+      .is("deleted_at", null);
+    if (productCountResult.error) throw productCountResult.error;
+    const activeProductCount = productCountResult.count || 0;
+
+    if (activeProductCount > 50) {
+      await page.goto(`${baseUrl}/products?page=2`, { waitUntil: "domcontentloaded" });
+      await page
+        .getByText(`Showing 51-${Math.min(100, activeProductCount)} of ${activeProductCount}`)
+        .waitFor();
+      const lastProductPage = Math.ceil(activeProductCount / 50);
+      await page.getByLabel(`Page ${lastProductPage}`, { exact: true }).click();
+      await page.waitForURL(new RegExp(`[?&]page=${lastProductPage}(?:&|$)`));
+      await page.getByLabel("Page 1", { exact: true }).waitFor();
+      pass("product pagination and first/last-page navigation");
+    }
+
+    if (activeProductCount > 1000) {
+      const beyondDefaultLimit = await supabase
+        .from("products")
+        .select("sku")
+        .is("deleted_at", null)
+        .order("created_at", { ascending: false })
+        .range(1000, 1000)
+        .single();
+      if (beyondDefaultLimit.error) throw beyondDefaultLimit.error;
+
+      await page.goto(`${baseUrl}/products`, { waitUntil: "domcontentloaded" });
+      const downloadPromise = page.waitForEvent("download");
+      await page.getByRole("link", { name: "Export" }).click();
+      const download = await downloadPromise;
+      const downloadPath = await download.path();
+      assert.ok(downloadPath, "Product export did not produce a local download");
+      const exportedProducts = await readFile(downloadPath, "utf8");
+      assert.ok(
+        exportedProducts.includes(`"${beyondDefaultLimit.data.sku.replace(/"/g, '""')}"`),
+        "Product export stopped before records beyond the first 1,000 rows"
+      );
+      pass("product export includes records beyond the first 1,000 rows");
+    }
 
     const quoteProductName = `${prefix} Quote Product`;
     await createProduct(page, testSkus.quote, quoteProductName);
@@ -453,7 +528,15 @@ async function run() {
     const generatedPdfFile = await context.request.get(generatedPdfResult.url);
     assert.equal(generatedPdfFile.status(), 200);
     assert.equal((await generatedPdfFile.body()).subarray(0, 4).toString(), "%PDF");
-    pass("preview-template PDF generation and signed link");
+    const pdfTrackingResult = await supabase
+      .from("pdf_files")
+      .select("id, storage_path")
+      .eq("quotation_id", quotationId)
+      .eq("storage_path", generatedPdfResult.path)
+      .single();
+    if (pdfTrackingResult.error) throw pdfTrackingResult.error;
+    assert.equal(pdfTrackingResult.data.storage_path, generatedPdfResult.path);
+    pass("preview-template PDF generation, tracking, and signed link");
 
     await page.evaluate(() => {
       window.__quotationPrintCount = 0;
@@ -543,7 +626,12 @@ async function run() {
     await login(page, salesEmail, testPassword);
     await page.goto(`${baseUrl}/members`);
     await page.waitForURL(/\/dashboard$/);
-    pass("non-admin member route restriction");
+    assert.equal(
+      await page.getByRole("link", { name: "Company Settings", exact: true }).count(),
+      0,
+      "Company Settings shortcut was visible to a non-admin member"
+    );
+    pass("non-admin route restriction and dashboard shortcut visibility");
 
     const salesQuotationId = await createQuotationAsSalesMember(page, quoteProductName);
     assert.ok(salesQuotationId);

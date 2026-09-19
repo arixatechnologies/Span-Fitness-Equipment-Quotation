@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import chromium from "@sparticuz/chromium";
+import { randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
 import puppeteer from "puppeteer-core";
 import { getQuotationWithItems, logActivity } from "@/lib/data";
@@ -131,7 +132,7 @@ async function createQuotationPdf(supabase: any, id: string) {
 
 async function storeQuotationPdf(supabase: any, id: string) {
   const { quotation, pdf, filename } = await createQuotationPdf(supabase, id);
-  const path = `quotations/${quotation.id}/${filename}`;
+  const path = `quotations/${quotation.id}/${randomUUID()}-${filename}`;
 
   const { error: uploadError } = await supabase.storage
     .from("quotation-pdfs")
@@ -142,48 +143,104 @@ async function storeQuotationPdf(supabase: any, id: string) {
 
   if (uploadError) throw new Error(uploadError.message);
 
-  const expiresIn = 60 * 60 * 24 * 30;
-  const [shareResult, downloadResult] = await Promise.all([
-    supabase.storage.from("quotation-pdfs").createSignedUrl(path, expiresIn),
-    supabase.storage
-      .from("quotation-pdfs")
-      .createSignedUrl(path, expiresIn, { download: filename })
-  ]);
+  let trackingId: string | null = null;
+  let shareUrl = "";
+  let downloadUrl = "";
 
-  if (shareResult.error || !shareResult.data?.signedUrl) {
-    throw new Error(shareResult.error?.message || "Unable to create PDF link");
+  try {
+    const expiresIn = 60 * 60 * 24 * 30;
+    const [shareResult, downloadResult] = await Promise.all([
+      supabase.storage.from("quotation-pdfs").createSignedUrl(path, expiresIn),
+      supabase.storage
+        .from("quotation-pdfs")
+        .createSignedUrl(path, expiresIn, { download: filename })
+    ]);
+
+    if (shareResult.error || !shareResult.data?.signedUrl) {
+      throw new Error(shareResult.error?.message || "Unable to create PDF link");
+    }
+
+    if (downloadResult.error || !downloadResult.data?.signedUrl) {
+      throw new Error(downloadResult.error?.message || "Unable to create PDF download link");
+    }
+
+    shareUrl = shareResult.data.signedUrl;
+    downloadUrl = downloadResult.data.signedUrl;
+
+    const expiresAt = new Date(Date.now() + expiresIn * 1000).toISOString();
+    const { data: tracking, error: trackingError } = await supabase
+      .from("pdf_files")
+      .insert({
+        quotation_id: quotation.id,
+        storage_path: path,
+        signed_url: shareUrl,
+        expires_at: expiresAt
+      })
+      .select("id")
+      .single();
+
+    if (trackingError || !tracking) {
+      throw new Error(
+        trackingError?.message || "Unable to track generated PDF for automatic cleanup"
+      );
+    }
+    trackingId = tracking.id;
+
+    const { error: updateError } = await supabase
+      .from("quotations")
+      .update({ pdf_url: shareUrl, pdf_path: path, status: "Sent" })
+      .eq("id", quotation.id);
+
+    if (updateError) throw new Error(updateError.message);
+  } catch (error) {
+    const rollbackTasks: Promise<unknown>[] = [
+      supabase.storage.from("quotation-pdfs").remove([path])
+    ];
+
+    if (trackingId) {
+      rollbackTasks.push(supabase.from("pdf_files").delete().eq("id", trackingId));
+    }
+
+    const rollbackResults = await Promise.allSettled(rollbackTasks);
+    rollbackResults.forEach((result) => {
+      if (result.status === "rejected") {
+        console.error("Generated PDF rollback failed", result.reason);
+      } else {
+        const rollbackValue = result.value as { error?: unknown } | null;
+
+        if (rollbackValue?.error) {
+          console.error("Generated PDF rollback failed", rollbackValue.error);
+        }
+      }
+    });
+
+    throw error;
   }
-
-  if (downloadResult.error || !downloadResult.data?.signedUrl) {
-    throw new Error(downloadResult.error?.message || "Unable to create PDF download link");
-  }
-
-  const expiresAt = new Date(Date.now() + expiresIn * 1000).toISOString();
-  const { error: updateError } = await supabase
-    .from("quotations")
-    .update({ pdf_url: shareResult.data.signedUrl, pdf_path: path, status: "Sent" })
-    .eq("id", quotation.id);
-
-  if (updateError) throw new Error(updateError.message);
-
-  await supabase.from("pdf_files").insert({
-    quotation_id: quotation.id,
-    storage_path: path,
-    signed_url: shareResult.data.signedUrl,
-    expires_at: expiresAt
-  });
 
   if (quotation.pdf_path && quotation.pdf_path !== path) {
-    await supabase.storage.from("quotation-pdfs").remove([quotation.pdf_path]);
+    try {
+      const { error: oldFileError } = await supabase.storage
+        .from("quotation-pdfs")
+        .remove([quotation.pdf_path]);
+
+      if (oldFileError) {
+        console.error("Previous quotation PDF cleanup failed", oldFileError);
+      } else {
+        const { error: oldTrackingError } = await supabase
+          .from("pdf_files")
+          .delete()
+          .eq("storage_path", quotation.pdf_path);
+
+        if (oldTrackingError) {
+          console.error("Previous quotation PDF tracking cleanup failed", oldTrackingError);
+        }
+      }
+    } catch (cleanupError) {
+      console.error("Previous quotation PDF cleanup failed", cleanupError);
+    }
   }
 
-  return {
-    quotation,
-    path,
-    shareUrl: shareResult.data.signedUrl,
-    downloadUrl: downloadResult.data.signedUrl,
-    filename
-  };
+  return { quotation, path, shareUrl, downloadUrl, filename };
 }
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {

@@ -83,6 +83,7 @@ Or run the SQL files manually in Supabase SQL Editor:
 - `supabase/migrations/012_fix_login_throttle_function.sql`
 - `supabase/migrations/013_cleanup_stale_login_attempts.sql`
 - `supabase/migrations/014_transactional_quotations_and_excel_storage.sql`
+- `supabase/migrations/015_add_quotation_item_sort_order.sql`
 
 5. Set your admin login.
 

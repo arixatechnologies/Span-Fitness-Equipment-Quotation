@@ -1,11 +1,14 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { Plus, Upload, FileText, Settings } from "lucide-react";
 import { StatCard, SectionTitle, StatusBadge } from "@/components/ui";
-import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { requireUser } from "@/lib/supabase/server";
 import { formatCurrency, formatCustomerName, formatDate } from "@/lib/format";
 
 export default async function DashboardPage() {
-  const supabase = await createServerSupabaseClient();
+  const { supabase, user } = await requireUser().catch(() =>
+    redirect("/api/auth/logout?reason=session_expired")
+  );
   const monthStart = new Date();
   monthStart.setDate(1);
   monthStart.setHours(0, 0, 0, 0);
@@ -61,7 +64,11 @@ export default async function DashboardPage() {
         <StatCard label="Quotation Value" value={formatCurrency(totalValue)} helper="All statuses" />
       </div>
 
-      <div className="grid gap-3 md:grid-cols-5">
+      <div
+        className={
+          user.role === "Admin" ? "grid gap-3 md:grid-cols-5" : "grid gap-3 md:grid-cols-4"
+        }
+      >
         <Link href="/products/new" className="btn-primary">
           <Plus className="h-4 w-4" />
           Add Product
@@ -77,10 +84,12 @@ export default async function DashboardPage() {
         <Link href="/quotations" className="btn-secondary">
           View Quotations
         </Link>
-        <Link href="/settings/company" className="btn-secondary">
-          <Settings className="h-4 w-4" />
-          Company Settings
-        </Link>
+        {user.role === "Admin" ? (
+          <Link href="/settings/company" className="btn-secondary">
+            <Settings className="h-4 w-4" />
+            Company Settings
+          </Link>
+        ) : null}
       </div>
 
       <section className="panel overflow-hidden">

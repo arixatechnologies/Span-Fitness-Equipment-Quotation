@@ -1,11 +1,14 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { Eye, Pencil, Plus } from "lucide-react";
 import { ConfirmDeleteButton } from "@/components/confirm-delete-button";
+import { Pagination } from "@/components/pagination";
 import { SearchField } from "@/components/search-field";
 import { EmptyState, StatusBadge } from "@/components/ui";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { formatCurrency, formatCustomerName, formatDate } from "@/lib/format";
 import { getSearchText } from "@/lib/search";
+import { buildPageHref, getPageNumber, LIST_PAGE_SIZE } from "@/lib/pagination";
 
 type SearchParams = Record<string, string | string[] | undefined>;
 
@@ -17,11 +20,13 @@ export default async function QuotationsPage({
   const params = await searchParams;
   const q = getSearchText(params.q);
   const status = getSearchText(params.status);
+  const page = getPageNumber(params.page);
   const supabase = await createServerSupabaseClient();
   let query = supabase
     .from("quotations")
-    .select("*")
-    .order("created_at", { ascending: false });
+    .select("*", { count: "exact" })
+    .order("created_at", { ascending: false })
+    .range((page - 1) * LIST_PAGE_SIZE, page * LIST_PAGE_SIZE - 1);
 
   if (q) {
     query = query.or(
@@ -36,8 +41,15 @@ export default async function QuotationsPage({
   }
   if (status) query = query.eq("status", status);
 
-  const { data: quotations, error } = await query;
+  const { data: quotations, error, count } = await query;
   if (error) throw new Error(error.message);
+
+  const filteredCount = count || 0;
+  const totalPages = Math.max(1, Math.ceil(filteredCount / LIST_PAGE_SIZE));
+
+  if (filteredCount > 0 && page > totalPages) {
+    redirect(buildPageHref("/quotations", { q, status }, totalPages));
+  }
 
   return (
     <div className="grid gap-5">
@@ -79,7 +91,8 @@ export default async function QuotationsPage({
       </form>
 
       {(quotations || []).length ? (
-        <section className="panel overflow-hidden">
+        <>
+          <section className="panel overflow-hidden">
           <div className="grid gap-3 p-3 md:hidden">
             {(quotations || []).map((quotation: any) => {
               const customer = quotation.customer_snapshot || {};
@@ -226,7 +239,15 @@ export default async function QuotationsPage({
               </tbody>
             </table>
           </div>
-        </section>
+          </section>
+          <Pagination
+            pathname="/quotations"
+            currentPage={page}
+            pageSize={LIST_PAGE_SIZE}
+            totalItems={filteredCount}
+            query={{ q, status }}
+          />
+        </>
       ) : (
         <EmptyState
           title="No quotations found"

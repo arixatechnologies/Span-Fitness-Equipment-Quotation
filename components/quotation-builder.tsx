@@ -334,6 +334,7 @@ export function QuotationBuilder({
       ? quotationItems.map(itemFromQuotation).map((item) => applyDiscountLimit(item, maxDiscountPercent))
       : []
   );
+  const [discountDrafts, setDiscountDrafts] = useState<Record<number, string>>({});
   const [discountMessages, setDiscountMessages] = useState<Record<number, string>>({});
   const [openProductRow, setOpenProductRow] = useState<number | null>(null);
   const [productSearches, setProductSearches] = useState<Record<number, string>>({});
@@ -403,6 +404,12 @@ export function QuotationBuilder({
         };
       })
     );
+    setDiscountDrafts((current) => {
+      const next = { ...current };
+      delete next[index];
+      return next;
+    });
+    setDiscountMessage(index);
     setOpenProductRow(null);
     setProductSearches((current) => ({ ...current, [index]: "" }));
   }
@@ -418,16 +425,33 @@ export function QuotationBuilder({
           : item
       )
     );
+    setDiscountDrafts((current) => {
+      const next = { ...current };
+      delete next[index];
+      return next;
+    });
+    setDiscountMessage(index);
     setOpenProductRow(null);
     setProductSearches((current) => ({ ...current, [index]: "" }));
   }
 
   function updateDiscount(index: number, value: string) {
+    if (value === "") {
+      setDiscountDrafts((current) => ({ ...current, [index]: "" }));
+      setDiscountMessage(index);
+      return;
+    }
+
     const requestedDiscount = Math.min(100, Math.max(0, Number(value || 0)));
     const discount =
       maxDiscountPercent === null
         ? requestedDiscount
         : Math.min(requestedDiscount, maxDiscountPercent);
+
+    setDiscountDrafts((current) => ({
+      ...current,
+      [index]: discount === requestedDiscount ? value : String(discount)
+    }));
 
     setDiscountMessage(
       index,
@@ -464,7 +488,27 @@ export function QuotationBuilder({
         ? discountLimitMessage(maxDiscountPercent)
         : undefined
     );
+    setDiscountDrafts((current) => {
+      const next = { ...current };
+      delete next[index];
+      return next;
+    });
     updateItem(index, { special_price: Math.max(requestedPrice, minimumPrice) });
+  }
+
+  function finishDiscountEditing(index: number) {
+    if (discountDrafts[index] !== "") return;
+
+    const item = items[index];
+    if (!item) return;
+
+    setDiscountDrafts((current) => {
+      const next = { ...current };
+      delete next[index];
+      return next;
+    });
+    setDiscountMessage(index);
+    updateItem(index, { special_price: Number(item.unit_price || 0) });
   }
 
   function removeItem(index: number) {
@@ -487,6 +531,17 @@ export function QuotationBuilder({
       return next;
     });
     setDiscountMessages((current) => {
+      const next: Record<number, string> = {};
+
+      Object.entries(current).forEach(([key, value]) => {
+        const rowIndex = Number(key);
+        if (rowIndex < index) next[rowIndex] = value;
+        if (rowIndex > index) next[rowIndex - 1] = value;
+      });
+
+      return next;
+    });
+    setDiscountDrafts((current) => {
       const next: Record<number, string> = {};
 
       Object.entries(current).forEach(([key, value]) => {
@@ -771,8 +826,9 @@ export function QuotationBuilder({
                       min="0"
                       max={maxDiscountPercent ?? 100}
                       step="0.01"
-                      value={getDiscountPercent(item)}
+                      value={discountDrafts[index] ?? getDiscountPercent(item)}
                       onChange={(event) => updateDiscount(index, event.target.value)}
+                      onBlur={() => finishDiscountEditing(index)}
                     />
                     {discountMessages[index] ? (
                       <p className="mt-1 text-[10px] font-semibold leading-tight text-red-600" aria-live="polite">
@@ -932,8 +988,9 @@ export function QuotationBuilder({
                     min="0"
                     max={maxDiscountPercent ?? 100}
                     step="0.01"
-                    value={getDiscountPercent(item)}
+                    value={discountDrafts[index] ?? getDiscountPercent(item)}
                     onChange={(event) => updateDiscount(index, event.target.value)}
+                    onBlur={() => finishDiscountEditing(index)}
                   />
                   {discountMessages[index] ? (
                     <p className="mt-1 text-xs font-semibold text-red-600" aria-live="polite">

@@ -38,8 +38,8 @@ export default function AdminError({
             <li>Run `supabase/migrations/001_schema.sql` first.</li>
             <li>Run `supabase/migrations/002_seed.sql` second.</li>
             <li>
-              Run every later migration in order, including `005_update_ui_theme_color.sql` and
-              migrations through `008_add_account_profile_fields.sql`.
+              Run every later migration in numerical order through
+              `015_add_quotation_item_sort_order.sql`.
             </li>
             <li>Restart the dev server and refresh this page.</li>
           </ol>

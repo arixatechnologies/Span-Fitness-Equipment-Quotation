@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { z } from "zod";
 import { databaseErrorMessage, type ActionState } from "@/lib/action-state";
 import { logActivity } from "@/lib/data";
@@ -82,7 +83,10 @@ export async function saveBrandAction(
   }
 
   revalidatePath("/brands");
-  return { status: "success", message: id ? "Brand updated successfully." : "Brand added successfully." };
+  return {
+    status: "success",
+    message: id ? "Brand Updated Successfully" : "Brand Added Successfully"
+  };
 }
 
 export async function toggleBrandAction(formData: FormData) {
@@ -110,6 +114,7 @@ export async function deleteBrandAction(formData: FormData) {
 
   revalidatePath("/brands");
   revalidatePath("/products");
+  redirect("/brands?notice=deleted");
 }
 
 export async function saveCategoryAction(formData: FormData) {

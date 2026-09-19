@@ -3,10 +3,18 @@ import { deleteBrandAction, toggleBrandAction } from "@/app/actions/taxonomy";
 import { BrandActionForm } from "@/components/brand-action-form";
 import { RequiredMark } from "@/components/required-mark";
 import { SubmitButton } from "@/components/submit-button";
+import { TimedNotice } from "@/components/timed-notice";
 import { StatusBadge } from "@/components/ui";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
-export default async function BrandsPage() {
+type SearchParams = Record<string, string | string[] | undefined>;
+
+export default async function BrandsPage({
+  searchParams
+}: {
+  searchParams: Promise<SearchParams>;
+}) {
+  const params = await searchParams;
   const supabase = await createServerSupabaseClient();
   const { data: brands, error } = await supabase.from("brands").select("*").order("name");
   if (error) throw new Error(error.message);
@@ -17,6 +25,10 @@ export default async function BrandsPage() {
         <h1 className="text-2xl font-black text-slate-950">Brands</h1>
         <p className="text-sm text-slate-500">Manage product brands used in product dropdowns.</p>
       </div>
+
+      {params.notice === "deleted" ? (
+        <TimedNotice message="Brand Deleted Successfully" clearHref="/brands" />
+      ) : null}
 
       <BrandActionForm
         className="panel grid gap-3 p-4 md:grid-cols-[1fr_auto_auto]"
