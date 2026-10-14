@@ -135,6 +135,7 @@ export default async function QuotationPreviewPage({
           <QuotationActions
             quotationId={quotation.id}
             editHref={`/quotations/${quotation.id}/edit`}
+            createNewHref={`/quotations/new?duplicate=${quotation.id}`}
             initialPdfUrl={quotation.pdf_url}
             previewFrameId="quotation-pdf-preview"
             proformaFrameId="quotation-proforma-preview"

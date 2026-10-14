@@ -6,6 +6,7 @@ import {
   Download,
   FileSpreadsheet,
   FileText,
+  FilePlus2,
   Loader2,
   Pencil
 } from "lucide-react";
@@ -56,6 +57,7 @@ const actionLoadingCopy = {
 export function QuotationActions({
   quotationId,
   editHref,
+  createNewHref,
   previewFrameId,
   proformaFrameId,
   autoDownload = false,
@@ -67,6 +69,7 @@ export function QuotationActions({
 }: {
   quotationId: string;
   editHref: string;
+  createNewHref?: string;
   initialPdfUrl?: string | null;
   previewFrameId?: string;
   proformaFrameId?: string;
@@ -387,6 +390,13 @@ Thank you.`;
         <Pencil className="h-4 w-4" />
         Edit PDF
       </Link>
+
+      {createNewHref ? (
+        <Link href={createNewHref} className="btn-secondary w-full sm:w-auto">
+          <FilePlus2 className="h-4 w-4" />
+          Create New Quotation
+        </Link>
+      ) : null}
 
       <button
         ref={downloadButtonRef}

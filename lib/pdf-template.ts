@@ -136,7 +136,7 @@ function tableHead(documentVariant: PdfDocumentVariant) {
     <thead>
       <tr>
         <th>#</th>
-        <th>Description</th>
+        <th>Model/Description</th>
         <th>Unit Price<br>${currencyHeaderMark()}</th>
         <th>Special<br>Price ${currencyHeaderMark()}</th>
         <th>Qty</th>
@@ -181,7 +181,7 @@ function productRows(
         ? `
       <tr class="p-row">
         <td class="center top">${startIndex + index + 1}</td>
-        <td class="desc proforma-product-desc">${productDescription(item)}</td>
+        <td class="desc proforma-product-desc"><strong>${escapeHtml(item.product_name)}</strong></td>
         <td class="center top">${amount(item.unit_price)}</td>
         <td class="center top">${amount(item.special_price)}</td>
         <td class="center top">${amount(item.qty)}</td>
@@ -240,9 +240,15 @@ function chunk<T>(items: T[], size: number) {
   return chunks;
 }
 
-function splitProductPages(items: QuotationItem[]) {
-  const first = items.slice(0, 4);
-  return { first, continuation: chunk(items.slice(4), 5) };
+function splitProductPages(items: QuotationItem[], documentVariant: PdfDocumentVariant) {
+  const firstPageSize = documentVariant === "proforma" ? 10 : 4;
+  const continuationPageSize = documentVariant === "proforma" ? 15 : 5;
+  const first = items.slice(0, firstPageSize);
+
+  return {
+    first,
+    continuation: chunk(items.slice(firstPageSize), continuationPageSize)
+  };
 }
 
 function headerImage(chromeImages: PdfChromeImages) {
@@ -515,7 +521,7 @@ export function renderQuotationHtml({
   documentVariant = "quotation"
 }: PdfTemplateInput) {
   const customer = customerFromSnapshot(quotation.customer_snapshot);
-  const { first, continuation } = splitProductPages(items);
+  const { first, continuation } = splitProductPages(items, documentVariant);
   let nextIndex = first.length;
 
   const continuationPages = continuation
@@ -741,6 +747,13 @@ html, body {
   height: 31.5mm;
   padding-top: .8mm;
   padding-bottom: .8mm;
+}
+
+.proforma-invoice .product-table .p-row td {
+  height: 10mm;
+  padding-top: 1.8mm;
+  padding-bottom: 1.8mm;
+  vertical-align: middle;
 }
 
 .total-table {

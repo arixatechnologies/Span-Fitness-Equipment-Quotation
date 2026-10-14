@@ -36,6 +36,8 @@ type QuotationBuilderProps = {
   settings: CompanySettings;
   maxDiscountPercent: number | null;
   quotation?: Quotation;
+  duplicateFrom?: Quotation;
+  initialQuoteDate?: string;
   quotationItems?: QuotationItem[];
 };
 
@@ -322,13 +324,18 @@ export function QuotationBuilder({
   settings,
   maxDiscountPercent,
   quotation,
+  duplicateFrom,
+  initialQuoteDate,
   quotationItems = []
 }: QuotationBuilderProps) {
-  const snapshot = quotation?.customer_snapshot as Partial<Customer> | undefined;
+  const sourceQuotation = quotation || duplicateFrom;
+  const snapshot = sourceQuotation?.customer_snapshot as Partial<Customer> | undefined;
   const [customerMode, setCustomerMode] = useState<"existing" | "new">(
-    quotation?.customer_id ? "existing" : "new"
+    sourceQuotation?.customer_id ? "existing" : "new"
   );
-  const [customerId, setCustomerId] = useState(quotation?.customer_id || customers[0]?.id || "");
+  const [customerId, setCustomerId] = useState(
+    sourceQuotation?.customer_id || customers[0]?.id || ""
+  );
   const [items, setItems] = useState<QuotationItemInput[]>(
     quotationItems.length
       ? quotationItems.map(itemFromQuotation).map((item) => applyDiscountLimit(item, maxDiscountPercent))
@@ -338,7 +345,7 @@ export function QuotationBuilder({
   const [discountMessages, setDiscountMessages] = useState<Record<number, string>>({});
   const [openProductRow, setOpenProductRow] = useState<number | null>(null);
   const [productSearches, setProductSearches] = useState<Record<number, string>>({});
-  const gstMode = quotation?.gst_mode || settings.default_gst_mode;
+  const gstMode = sourceQuotation?.gst_mode || settings.default_gst_mode;
   const defaultGstPercent = Number(settings.default_gst_percent || 18);
   const hasSelectedCustomer = customers.some((customer) => customer.id === customerId);
 
@@ -563,45 +570,45 @@ export function QuotationBuilder({
       <input
         type="hidden"
         name="quote_date"
-        value={quotation?.quote_date || new Date().toISOString().slice(0, 10)}
+        value={quotation?.quote_date || initialQuoteDate || new Date().toISOString().slice(0, 10)}
       />
       <input
         type="hidden"
         name="validity_days"
-        value={quotation?.validity_days || settings.default_validity_days}
+        value={sourceQuotation?.validity_days || settings.default_validity_days}
       />
       <input type="hidden" name="gst_mode" value={gstMode} />
       <input
         type="hidden"
         name="prepared_by"
-        value={quotation?.prepared_by || settings.authorized_person_name}
+        value={sourceQuotation?.prepared_by || settings.authorized_person_name}
       />
       <input type="hidden" name="status" value={quotation?.status || "Draft"} />
-      <input type="hidden" name="terms" value={quotation?.terms || settings.default_terms} />
+      <input type="hidden" name="terms" value={sourceQuotation?.terms || settings.default_terms} />
       <input
         type="hidden"
         name="warranty_note"
-        value={quotation?.warranty_note || settings.default_warranty}
+        value={sourceQuotation?.warranty_note || settings.default_warranty}
       />
       <input
         type="hidden"
         name="delivery_note"
-        value={quotation?.delivery_note || settings.default_delivery}
+        value={sourceQuotation?.delivery_note || settings.default_delivery}
       />
       <input
         type="hidden"
         name="transportation_note"
-        value={quotation?.transportation_note || settings.default_transportation}
+        value={sourceQuotation?.transportation_note || settings.default_transportation}
       />
       <input
         type="hidden"
         name="payment_terms"
-        value={quotation?.payment_terms || settings.default_payment_terms}
+        value={sourceQuotation?.payment_terms || settings.default_payment_terms}
       />
       <input
         type="hidden"
         name="after_sales_support"
-        value={quotation?.after_sales_support || settings.default_after_sales_support}
+        value={sourceQuotation?.after_sales_support || settings.default_after_sales_support}
       />
 
       <section className="panel min-w-0 p-5">
