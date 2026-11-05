@@ -6,9 +6,11 @@ import { z } from "zod";
 import { calculateQuotation } from "@/lib/calculations";
 import { getCompanySettings, logActivity } from "@/lib/data";
 import { discountLimitMessage, exceedsDiscountLimit } from "@/lib/discount-limit";
+import { determineGstType } from "@/lib/gst";
+import { indiaStateCityList } from "@/lib/india-state-city-list";
 import { isTenDigitPhone, PHONE_VALIDATION_MESSAGE } from "@/lib/phone";
 import { requireUser } from "@/lib/supabase/server";
-import type { GstMode, QuotationItemInput, QuotationStatus } from "@/lib/types";
+import type { GstMode, GstType, QuotationItemInput, QuotationStatus } from "@/lib/types";
 
 const itemSchema = z.object({
   product_id: z.string().uuid().nullable().optional(),
@@ -35,6 +37,9 @@ const quotationStatusSchema = z.enum([
   "Cancelled"
 ]);
 const phoneSchema = z.string().trim().refine(isTenDigitPhone, PHONE_VALIDATION_MESSAGE);
+const indiaStateSchema = z.enum(
+  indiaStateCityList.map(({ state }) => state) as [string, ...string[]]
+);
 
 function clean(value: FormDataEntryValue | null) {
   const text = String(value || "").trim();
@@ -66,7 +71,7 @@ function customerInputFromForm(formData: FormData) {
       gst_number: clean(formData.get("new_gst_number")),
       address: clean(formData.get("new_address")),
       city: clean(formData.get("new_city")),
-      state: clean(formData.get("new_state")),
+      state: indiaStateSchema.parse(formData.get("new_state")),
       pincode: clean(formData.get("new_pincode")),
       notes: clean(formData.get("new_notes"))
     }
@@ -77,7 +82,9 @@ function quotationPayloadFromForm(
   formData: FormData,
   settings: Awaited<ReturnType<typeof getCompanySettings>>,
   calculated: ReturnType<typeof calculateQuotation>,
-  status: QuotationStatus
+  status: QuotationStatus,
+  placeOfSupply: string,
+  gstType: GstType
 ) {
   const gstMode = z.enum(["add", "included", "none"]).parse(formData.get("gst_mode"));
 
@@ -88,10 +95,15 @@ function quotationPayloadFromForm(
     discount_amount: calculated.totals.discount_amount,
     total_special_price: calculated.totals.total_special_price,
     gst_amount: calculated.totals.gst_amount,
+    cgst_amount: calculated.totals.cgst_amount,
+    sgst_amount: calculated.totals.sgst_amount,
+    igst_amount: calculated.totals.igst_amount,
     net_total: calculated.totals.net_total,
     round_off: calculated.totals.round_off,
     grand_total: calculated.totals.grand_total,
     gst_mode: gstMode,
+    gst_type: gstType,
+    place_of_supply: placeOfSupply,
     terms: String(formData.get("terms") || settings.default_terms),
     payment_terms: String(formData.get("payment_terms") || settings.default_payment_terms),
     transportation_note: String(
@@ -122,6 +134,27 @@ export async function saveQuotationAction(formData: FormData) {
   const gstMode = z.enum(["add", "included", "none"]).parse(formData.get("gst_mode"));
   const rawItems = JSON.parse(String(formData.get("items") || "[]"));
   const items = z.array(itemSchema).min(1).parse(rawItems) as QuotationItemInput[];
+  const { customerId, customerPayload } = customerInputFromForm(formData);
+
+  let customerState = customerPayload?.state;
+  if (customerId) {
+    const { data: customer, error: customerError } = await supabase
+      .from("customers")
+      .select("state")
+      .eq("id", customerId)
+      .single();
+
+    if (customerError) throw new Error(customerError.message);
+    customerState = customer?.state;
+  }
+
+  const stateResult = indiaStateSchema.safeParse(customerState);
+  if (!stateResult.success) {
+    throw new Error("Customer State is required to calculate GST automatically.");
+  }
+
+  const placeOfSupply = stateResult.data;
+  const gstType = determineGstType(placeOfSupply, gstMode);
 
   const maxDiscountPercent = user.maxDiscountPercent;
 
@@ -137,13 +170,14 @@ export async function saveQuotationAction(formData: FormData) {
     }
   }
 
-  const calculated = calculateQuotation(items, gstMode as GstMode);
-  const { customerId, customerPayload } = customerInputFromForm(formData);
+  const calculated = calculateQuotation(items, gstMode as GstMode, gstType);
   const basePayload = quotationPayloadFromForm(
     formData,
     settings,
     calculated,
-    status
+    status,
+    placeOfSupply,
+    gstType
   );
 
   const itemPayload = calculated.items.map((item, index) => ({
@@ -164,7 +198,11 @@ export async function saveQuotationAction(formData: FormData) {
     gst_percent: item.gst_percent,
     list_total: item.list_total,
     special_total: item.special_total,
+    taxable_value: item.taxable_value,
     gst_amount: item.gst_amount,
+    cgst_amount: item.cgst_amount,
+    sgst_amount: item.sgst_amount,
+    igst_amount: item.igst_amount,
     line_total: item.line_total
   }));
 
@@ -182,7 +220,7 @@ export async function saveQuotationAction(formData: FormData) {
   }
 
   const { data: savedId, error: saveError } = await supabase.rpc(
-    "save_quotation_transaction",
+    "save_quotation_with_gst_transaction",
     {
       p_quotation_id: quotationId || null,
       p_customer_id: customerId,
@@ -219,7 +257,7 @@ export async function createRevisionAction(formData: FormData) {
   const { supabase, user } = await requireUser();
   const id = z.string().uuid().parse(formData.get("id"));
   const { data, error } = await supabase.rpc(
-    "create_quotation_revision_transaction",
+    "create_quotation_revision_with_gst_transaction",
     {
       p_source_quotation_id: id,
       p_created_by: user.id

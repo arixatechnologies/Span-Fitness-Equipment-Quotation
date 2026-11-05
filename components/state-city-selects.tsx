@@ -8,13 +8,17 @@ type StateCitySelectsProps = {
   cityName?: string;
   defaultState?: string | null;
   defaultCity?: string | null;
+  stateRequired?: boolean;
+  onStateChange?: (state: string) => void;
 };
 
 export function StateCitySelects({
   stateName = "state",
   cityName = "city",
   defaultState,
-  defaultCity
+  defaultCity,
+  stateRequired = false,
+  onStateChange
 }: StateCitySelectsProps) {
   const stateOptions = indiaStateCityList.map((item) => item.state);
   const [selectedState, setSelectedState] = useState(defaultState || "");
@@ -41,9 +45,11 @@ export function StateCitySelects({
           className="field-input"
           name={stateName}
           value={selectedState}
+          required={stateRequired}
           onChange={(event) => {
             setSelectedState(event.target.value);
             setSelectedCity("");
+            onStateChange?.(event.target.value);
           }}
         >
           <option value="">Select state</option>

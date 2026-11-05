@@ -17,6 +17,7 @@ import {
   getMinimumSpecialPrice
 } from "@/lib/discount-limit";
 import { formatCustomerName, normalizeRoundedDisplayNumber } from "@/lib/format";
+import { determineGstType } from "@/lib/gst";
 import type {
   CompanySettings,
   Customer,
@@ -118,7 +119,7 @@ function itemFromProduct(product: BuilderProduct): QuotationItemInput {
     unit_price: Number(product.unit_price || 0),
     special_price: Number(product.unit_price || 0),
     qty: 1,
-    gst_percent: Number(product.gst_percent || 18)
+    gst_percent: Number(product.gst_percent ?? 18)
   };
 }
 
@@ -137,7 +138,7 @@ function itemFromQuotation(item: QuotationItem): QuotationItemInput {
     unit_price: Number(item.unit_price || 0),
     special_price: Number(item.special_price || 0),
     qty: Number(item.qty || 1),
-    gst_percent: Number(item.gst_percent || 18)
+    gst_percent: Number(item.gst_percent ?? 18)
   };
 }
 
@@ -330,11 +331,13 @@ export function QuotationBuilder({
 }: QuotationBuilderProps) {
   const sourceQuotation = quotation || duplicateFrom;
   const snapshot = sourceQuotation?.customer_snapshot as Partial<Customer> | undefined;
-  const [customerMode, setCustomerMode] = useState<"existing" | "new">(
-    sourceQuotation?.customer_id ? "existing" : "new"
-  );
-  const [customerId, setCustomerId] = useState(
-    sourceQuotation?.customer_id || customers[0]?.id || ""
+  const initialCustomerMode = sourceQuotation?.customer_id ? "existing" : "new";
+  const initialCustomerId = sourceQuotation?.customer_id || customers[0]?.id || "";
+  const initialCustomer = customers.find((customer) => customer.id === initialCustomerId);
+  const [customerMode, setCustomerMode] = useState<"existing" | "new">(initialCustomerMode);
+  const [customerId, setCustomerId] = useState(initialCustomerId);
+  const [placeOfSupply, setPlaceOfSupply] = useState(
+    (initialCustomerMode === "existing" ? initialCustomer?.state || snapshot?.state : snapshot?.state) || ""
   );
   const [items, setItems] = useState<QuotationItemInput[]>(
     quotationItems.length
@@ -346,7 +349,8 @@ export function QuotationBuilder({
   const [openProductRow, setOpenProductRow] = useState<number | null>(null);
   const [productSearches, setProductSearches] = useState<Record<number, string>>({});
   const gstMode = sourceQuotation?.gst_mode || settings.default_gst_mode;
-  const defaultGstPercent = Number(settings.default_gst_percent || 18);
+  const defaultGstPercent = Number(settings.default_gst_percent ?? 18);
+  const gstType = determineGstType(placeOfSupply, gstMode);
   const hasSelectedCustomer = customers.some((customer) => customer.id === customerId);
 
   const selectedItems = useMemo(
@@ -354,26 +358,28 @@ export function QuotationBuilder({
     [items]
   );
   const calculated = useMemo(
-    () => calculateQuotation(selectedItems, gstMode),
-    [selectedItems, gstMode]
+    () => calculateQuotation(selectedItems, gstMode, gstType),
+    [selectedItems, gstMode, gstType]
   );
   const gstSummaryRows = useMemo(() => {
-    const rows = new Map<number, { taxable: number; gst: number }>();
+    const rows = new Map<number, { taxable: number; cgst: number; sgst: number; igst: number }>();
 
     calculated.items.forEach((item) => {
-      const current = rows.get(item.gst_percent) || { taxable: 0, gst: 0 };
+      const current = rows.get(item.gst_percent) || { taxable: 0, cgst: 0, sgst: 0, igst: 0 };
       rows.set(item.gst_percent, {
-        taxable: roundMoney(current.taxable + item.special_total),
-        gst: roundMoney(current.gst + item.gst_amount)
+        taxable: roundMoney(current.taxable + item.taxable_value),
+        cgst: roundMoney(current.cgst + item.cgst_amount),
+        sgst: roundMoney(current.sgst + item.sgst_amount),
+        igst: roundMoney(current.igst + item.igst_amount)
       });
     });
 
     return Array.from(rows.entries()).map(([rate, values]) => ({
       rate,
       taxable: values.taxable,
-      cgst: roundMoney(values.gst / 2),
-      sgst: roundMoney(values.gst / 2),
-      igst: 0
+      cgst: values.cgst,
+      sgst: values.sgst,
+      igst: values.igst
     }));
   }, [calculated.items]);
 
@@ -578,6 +584,7 @@ export function QuotationBuilder({
         value={sourceQuotation?.validity_days || settings.default_validity_days}
       />
       <input type="hidden" name="gst_mode" value={gstMode} />
+      <input type="hidden" name="place_of_supply" value={placeOfSupply} />
       <input
         type="hidden"
         name="prepared_by"
@@ -617,7 +624,11 @@ export function QuotationBuilder({
           <div className="flex overflow-hidden rounded-md border border-line">
             <button
               type="button"
-              onClick={() => setCustomerMode("existing")}
+              onClick={() => {
+                setCustomerMode("existing");
+                const customer = customers.find((entry) => entry.id === customerId);
+                setPlaceOfSupply(customer?.state || snapshot?.state || "");
+              }}
               className={`px-3 py-2 text-sm font-semibold ${
                 customerMode === "existing" ? "bg-mist text-ink" : "bg-white text-slate-700"
               }`}
@@ -626,7 +637,10 @@ export function QuotationBuilder({
             </button>
             <button
               type="button"
-              onClick={() => setCustomerMode("new")}
+              onClick={() => {
+                setCustomerMode("new");
+                setPlaceOfSupply(snapshot?.state || "");
+              }}
               className={`px-3 py-2 text-sm font-semibold ${
                 customerMode === "new" ? "bg-mist text-ink" : "bg-white text-slate-700"
               }`}
@@ -645,7 +659,12 @@ export function QuotationBuilder({
             <select
               className="field-input"
               value={customerId}
-              onChange={(event) => setCustomerId(event.target.value)}
+              onChange={(event) => {
+                const nextCustomerId = event.target.value;
+                setCustomerId(nextCustomerId);
+                const customer = customers.find((entry) => entry.id === nextCustomerId);
+                setPlaceOfSupply(customer?.state || "");
+              }}
               required
             >
               <option value="">Select customer</option>
@@ -720,6 +739,8 @@ export function QuotationBuilder({
               cityName="new_city"
               defaultState={snapshot?.state || ""}
               defaultCity={snapshot?.city || ""}
+              stateRequired
+              onStateChange={setPlaceOfSupply}
             />
             <label>
               <span className="field-label">Pin Code</span>
@@ -1073,7 +1094,10 @@ export function QuotationBuilder({
             Add Product
           </button>
 
-          <TotalsPanel totals={calculated.totals} className="rounded-md border border-line bg-white p-4" />
+          <TotalsPanel
+            totals={calculated.totals}
+            className="rounded-md border border-line bg-white p-4"
+          />
         </div>
       </section>
 
@@ -1120,7 +1144,7 @@ export function QuotationBuilder({
 
       <div className="flex justify-end">
         <SubmitButton
-          disabled={!selectedItems.length}
+          disabled={!selectedItems.length || !placeOfSupply}
           pendingLabel={quotation ? "Updating..." : "Creating..."}
           className="inline-flex min-w-40 items-center justify-center rounded-full border border-mist bg-mist px-8 py-3 text-xs font-black text-ink shadow-sm transition hover:bg-cloud disabled:cursor-not-allowed disabled:opacity-60"
         >

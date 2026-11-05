@@ -5,6 +5,7 @@ import { RequiredMark } from "@/components/required-mark";
 import { SubmitButton } from "@/components/submit-button";
 import { ValidatedImageFileInput } from "@/components/validated-image-file-input";
 import { MAX_COMPANY_ASSET_BYTES } from "@/lib/upload-limits";
+import { SUPPLIER_STATE } from "@/lib/gst";
 import type { CompanySettings } from "@/lib/types";
 
 export function SettingsForm({
@@ -39,6 +40,10 @@ export function SettingsForm({
           <label>
             <span className="field-label">GST Number</span>
             <input className="field-input" name="gst_number" defaultValue={settings.gst_number} />
+          </label>
+          <label>
+            <span className="field-label">Supplier State</span>
+            <input className="field-input bg-slate-100" value={SUPPLIER_STATE} readOnly />
           </label>
           <label>
             <span className="field-label">Phone Numbers</span>

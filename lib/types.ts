@@ -24,6 +24,7 @@ export type QuotationStatus =
   | "Rejected"
   | "Cancelled";
 export type GstMode = "add" | "included" | "none";
+export type GstType = "cgst_sgst" | "igst" | "none";
 
 export type Brand = {
   id: string;
@@ -143,7 +144,11 @@ export type QuotationItemInput = {
 export type CalculatedQuotationItem = QuotationItemInput & {
   list_total: number;
   special_total: number;
+  taxable_value: number;
   gst_amount: number;
+  cgst_amount: number;
+  sgst_amount: number;
+  igst_amount: number;
   line_total: number;
 };
 
@@ -152,6 +157,9 @@ export type QuotationTotals = {
   total_special_price: number;
   discount_amount: number;
   gst_amount: number;
+  cgst_amount: number;
+  sgst_amount: number;
+  igst_amount: number;
   net_total: number;
   round_off: number;
   grand_total: number;
@@ -170,10 +178,15 @@ export type Quotation = {
   discount_amount: number;
   total_special_price: number;
   gst_amount: number;
+  cgst_amount: number;
+  sgst_amount: number;
+  igst_amount: number;
   net_total: number;
   round_off: number;
   grand_total: number;
   gst_mode: GstMode;
+  gst_type: GstType;
+  place_of_supply: string;
   terms: string;
   payment_terms: string;
   transportation_note: string;

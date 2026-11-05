@@ -86,6 +86,10 @@ function productImage(item: QuotationItem) {
 }
 
 function productDescription(item: QuotationItem) {
+  const productHeading = [item.sku, item.product_name]
+    .map((value) => String(value || "").trim())
+    .filter(Boolean)
+    .join(" - ");
   const detail = [
     lines(item.description),
     labelLine("Dimensions", item.dimensions),
@@ -96,7 +100,7 @@ function productDescription(item: QuotationItem) {
     .filter(Boolean)
     .join("");
 
-  return `<strong>${escapeHtml(item.product_name)}</strong>${detail ? `<br><br>${detail}` : ""}`;
+  return `<strong>${escapeHtml(productHeading)}</strong>${detail ? `<br><br>${detail}` : ""}`;
 }
 
 function tableColumns(documentVariant: PdfDocumentVariant) {

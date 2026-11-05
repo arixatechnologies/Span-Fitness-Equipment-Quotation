@@ -40,7 +40,7 @@ export function ProductForm({ product, brands }: ProductFormProps) {
     <form action={formAction} className="panel p-5">
       <ProductSavingOverlay isEdit={Boolean(product)} />
       <input type="hidden" name="id" value={product?.id || ""} />
-      <input type="hidden" name="gst_percent" value={product?.gst_percent || 18} />
+      <input type="hidden" name="gst_percent" value={product?.gst_percent ?? 18} />
       <input type="hidden" name="status" value={product?.status || "active"} />
       <input type="hidden" name="category_id" value={product?.category_id || ""} />
       <input type="hidden" name="sub_category_id" value={product?.sub_category_id || ""} />
