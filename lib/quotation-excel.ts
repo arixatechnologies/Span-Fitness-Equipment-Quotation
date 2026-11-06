@@ -107,6 +107,10 @@ function productBrand(item: QuotationItem) {
   return brand || "SPAN";
 }
 
+function productHeading(item: QuotationItem) {
+  return [text(item.sku), text(item.product_name)].filter(Boolean).join(" - ");
+}
+
 function productDescription(item: QuotationItem) {
   return [
     text(item.description),
@@ -420,7 +424,7 @@ function addProductRows(
       richText: [
         {
           font: { name: "Georgia", size: 10, bold: true, color: { argb: BLACK } },
-          text: item.product_name
+          text: productHeading(item)
         },
         ...(description
           ? [

@@ -85,11 +85,14 @@ function productImage(item: QuotationItem) {
   return `<img src="${escapeHtml(item.image_url)}" alt="${escapeHtml(item.product_name)}" />`;
 }
 
-function productDescription(item: QuotationItem) {
-  const productHeading = [item.sku, item.product_name]
+function productHeading(item: QuotationItem) {
+  return [item.sku, item.product_name]
     .map((value) => String(value || "").trim())
     .filter(Boolean)
     .join(" - ");
+}
+
+function productDescription(item: QuotationItem) {
   const detail = [
     lines(item.description),
     labelLine("Dimensions", item.dimensions),
@@ -100,7 +103,7 @@ function productDescription(item: QuotationItem) {
     .filter(Boolean)
     .join("");
 
-  return `<strong>${escapeHtml(productHeading)}</strong>${detail ? `<br><br>${detail}` : ""}`;
+  return `<strong>${escapeHtml(productHeading(item))}</strong>${detail ? `<br><br>${detail}` : ""}`;
 }
 
 function tableColumns(documentVariant: PdfDocumentVariant) {
@@ -185,7 +188,7 @@ function productRows(
         ? `
       <tr class="p-row">
         <td class="center top">${startIndex + index + 1}</td>
-        <td class="desc proforma-product-desc"><strong>${escapeHtml(item.product_name)}</strong></td>
+        <td class="desc proforma-product-desc"><strong>${escapeHtml(productHeading(item))}</strong></td>
         <td class="center top">${amount(item.unit_price)}</td>
         <td class="center top">${amount(item.special_price)}</td>
         <td class="center top">${amount(item.qty)}</td>
