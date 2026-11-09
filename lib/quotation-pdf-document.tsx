@@ -308,7 +308,9 @@ function ProductTable({
             <View style={cellStyle(3, true)}><Text>{amount(item.unit_price)}</Text></View>
             <View style={cellStyle(4, true)}><Text>{amount(item.special_price)}</Text></View>
             <View style={cellStyle(5, true)}><Text>{amount(item.qty)}</Text></View>
-            <View style={cellStyle(6, true)}><Text>{amount(item.line_total)}</Text></View>
+            <View style={cellStyle(6, true)}>
+              <Text>{amount(Number(item.special_price || 0) * Number(item.qty || 0))}</Text>
+            </View>
           </View>
         );
       })}

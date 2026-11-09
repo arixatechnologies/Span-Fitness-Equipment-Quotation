@@ -123,7 +123,7 @@ export default async function QuotationDetailPage({ params }: { params: Promise<
                   <td className="table-cell">{item.qty}</td>
                   <td className="table-cell text-right">{formatCurrency(item.special_price)}</td>
                   <td className="table-cell text-right font-black text-navy">
-                    {formatCurrency(item.line_total)}
+                    {formatCurrency(Number(item.special_price || 0) * Number(item.qty || 0))}
                   </td>
                 </tr>
               ))}

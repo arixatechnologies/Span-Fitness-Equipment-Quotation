@@ -33,7 +33,7 @@ export function calculateQuotation(
     const cgstAmount = gstType === "cgst_sgst" ? toMoney(gstAmount / 2) : 0;
     const sgstAmount = gstType === "cgst_sgst" ? toMoney(gstAmount - cgstAmount) : 0;
     const igstAmount = gstType === "igst" ? gstAmount : 0;
-    const lineTotal = gstMode === "add" ? toMoney(specialTotal + gstAmount) : specialTotal;
+    const lineTotal = specialTotal;
 
     return {
       ...item,

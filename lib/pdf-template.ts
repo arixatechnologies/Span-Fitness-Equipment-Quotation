@@ -92,6 +92,10 @@ function productHeading(item: QuotationItem) {
     .join(" - ");
 }
 
+function productLineTotal(item: QuotationItem) {
+  return Number(item.special_price || 0) * Number(item.qty || 0);
+}
+
 function productDescription(item: QuotationItem) {
   const detail = [
     lines(item.description),
@@ -192,7 +196,7 @@ function productRows(
         <td class="center top">${amount(item.unit_price)}</td>
         <td class="center top">${amount(item.special_price)}</td>
         <td class="center top">${amount(item.qty)}</td>
-        <td class="center top">${amount(item.line_total)}</td>
+        <td class="center top">${amount(productLineTotal(item))}</td>
       </tr>
     `
         : `
@@ -208,7 +212,7 @@ function productRows(
         <td class="center top">${amount(item.unit_price)}</td>
         <td class="center top">${amount(item.special_price)}</td>
         <td class="center top">${amount(item.qty)}</td>
-        <td class="center top">${amount(item.line_total)}</td>
+        <td class="center top">${amount(productLineTotal(item))}</td>
       </tr>
     `
     )
